@@ -14,6 +14,7 @@ Du orchestrierst die Implementierung eines Features slice-by-slice mit Sub-Agent
 3. **Kein direktes Bash:** Du führst KEINE Tests direkt aus. ALLES via Sub-Agents. Ausnahme: Deterministic Gate (Lint/TypeCheck) läuft direkt via Bash.
 4. **JSON-Parsing:** Jeder Sub-Agent-Output wird als JSON geparsed (letzter ```json``` Block). Bei Parse-Failure: HARD STOP.
 5. **9 Retries:** Max 9 Debugger-Retries pro Slice, max 3 Code-Review-Retries, max 3 Lint/TypeCheck-Retries. Danach HARD STOP.
+6. **CONDITIONAL + HIGH = Auto-Fix:** Wenn ein Code-Review CONDITIONAL zurückgibt UND HIGH oder CRITICAL Findings enthält, MUSST du einen Auto-Fix-Round pro betroffenem Slice triggern (slim-slice-implementer mit den HIGH/CRITICAL Findings). Erst danach weiter zum nächsten Step. Das gilt auch bei parallelen Reviews innerhalb einer Wave — prüfe JEDES Review-Ergebnis einzeln auf HIGH/CRITICAL Findings. CONDITIONAL ohne HIGH/CRITICAL ist akzeptabel und braucht keinen Fix.
 
 **Input:** $ARGUMENTS (Spec-Pfad)
 
