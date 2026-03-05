@@ -80,7 +80,20 @@ IF ANY check failed:
 
 ```
 STATE_FILE = "{spec_path}/.orchestrator-state.json"
+GATE_LOG = "{spec_path}/gate-log.jsonl"
 EVIDENCE_DIR = ".claude/evidence/{feature_name}/"
+
+# Gate-Log Helper: Appends one JSON line after each gate result.
+# Survives session crashes — alles bis zum letzten Gate ist persistiert.
+# Bei Resume: lies GATE_LOG um bereits bestandene Gates zu überspringen.
+FUNCTION log_gate(slice_id, gate, result_obj):
+  line = JSON.stringify({
+    "ts": ISO_TIMESTAMP,
+    "slice": slice_id,
+    "gate": gate,
+    ...result_obj
+  })
+  Bash("echo '{line}' >> {GATE_LOG}")
 
 state = {
   "spec_path": spec_path,
@@ -97,6 +110,9 @@ state = {
 
 IF EXISTS STATE_FILE:
   # Resume-Logik
+  # Lies GATE_LOG falls vorhanden um bereits bestandene Gates zu kennen.
+  # Format pro Zeile: {"ts":...,"slice":"slice-02","gate":"code_review","verdict":"APPROVED",...}
+  # Nutze dies um Gates zu überspringen die bereits PASSED/APPROVED sind.
 ```
 
 ---
@@ -245,10 +261,13 @@ FOR each wave IN waves:
       review_json = parse_agent_json(review_result)
 
       IF review_json.verdict == "APPROVED":
+        log_gate(slice_id, "code_review", {"verdict": "APPROVED", "blocking": 0, "attempt": review_retries + 1})
         OUTPUT: "Code Review: APPROVED"
         BREAK
 
       IF review_json.verdict == "REJECTED":
+        blocking = [f for f in review_json.findings if f.severity == "BLOCKING"]
+        log_gate(slice_id, "code_review", {"verdict": "REJECTED", "blocking": len(blocking), "findings": [f.message for f in blocking], "attempt": review_retries + 1})
         review_retries++
         OUTPUT: "Code Review REJECTED (Versuch {review_retries}/{MAX_REVIEW_RETRIES}) → Auto-Fix..."
 
@@ -294,12 +313,14 @@ FOR each wave IN waves:
             OUTPUT: "TypeCheck FAILED (Versuch {lint_retries + 1}/{MAX_LINT_RETRIES})"
 
         IF gate_passed:
+          log_gate(slice_id, "lint", {"result": "PASSED", "attempt": lint_retries + 1})
           OUTPUT: "Deterministic Gate PASSED"
           Bash("git diff --quiet || git add -A && git commit -m 'style({slice_id}): lint auto-fix'")
           BREAK
 
         lint_retries++
         IF lint_retries >= MAX_LINT_RETRIES:
+          log_gate(slice_id, "lint", {"result": "FAILED", "attempt": lint_retries})
           HARD STOP: "Deterministic Gate nach 3 Versuchen fehlgeschlagen für {slice_id}"
 
         fix_result = Task(
@@ -394,7 +415,10 @@ FOR each wave IN waves:
       val_json = parse_agent_json(validator_result)
 
     IF val_json.overall_status == "failed":
+      log_gate(slice_id, "tests", {"result": "FAILED", "retries": state.retry_count})
       HARD STOP: "9 Retries erschöpft für {slice_id}"
+
+    log_gate(slice_id, "tests", {"result": "PASSED", "retries": state.retry_count})
 
     # ── Evidence speichern ──
     state.current_state = "slice_complete"
