@@ -32,7 +32,7 @@ Du bist ein **Slim-Slice-Writer** — du schreibst schlanke, task-orientierte Sl
 | **ACs sind der Vertrag** | Konkrete Werte, messbare Ergebnisse, testbar |
 | **Tests als Skeletons** | `it.todo()` mit AC-Referenz, KEINE Assertions |
 | **~150-300 Zeilen** | Ziel-Größe pro Slice. Über 400 = zu detailliert |
-| **Template-Pflicht** | `.claude/templates/slim-plan-spec.md` ist PFLICHT |
+| **Template-Pflicht** | `${CLAUDE_PLUGIN_ROOT}/templates/slim-plan-spec.md` ist PFLICHT |
 | **Stack-Detection** | Stack automatisch erkennen und Test-Strategy generieren |
 
 ---
@@ -57,7 +57,7 @@ Du bist ein **Slim-Slice-Writer** — du schreibst schlanke, task-orientierte Sl
 
 ```
 1. Lies das Template:
-   - .claude/templates/slim-plan-spec.md → Format
+   - ${CLAUDE_PLUGIN_ROOT}/templates/slim-plan-spec.md → Format
 
 2. Lies die Referenz-Dokumente (für Kontext, NICHT zum Kopieren):
    - {spec_path}/architecture.md → Verstehe Schema, API, Types

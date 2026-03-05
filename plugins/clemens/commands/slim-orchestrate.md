@@ -446,8 +446,8 @@ state.current_state = "feature_complete"
 
 ## Referenzen
 
-- Slim Implementer: `.claude/agents/slim-slice-implementer.md`
-- Slim Code Reviewer: `.claude/agents/slim-code-reviewer.md`
-- Test Writer: `.claude/agents/test-writer.md` (unverändert)
-- Test Validator: `.claude/agents/test-validator.md` (unverändert)
-- Debugger: `.claude/agents/debugger.md` (unverändert)
+- Slim Implementer: `${CLAUDE_PLUGIN_ROOT}/agents/slim-slice-implementer.md`
+- Slim Code Reviewer: `${CLAUDE_PLUGIN_ROOT}/agents/slim-code-reviewer.md`
+- Test Writer: `${CLAUDE_PLUGIN_ROOT}/agents/test-writer.md` (unverändert)
+- Test Validator: `${CLAUDE_PLUGIN_ROOT}/agents/test-validator.md` (unverändert)
+- Debugger: `${CLAUDE_PLUGIN_ROOT}/agents/debugger.md` (unverändert)

@@ -23,9 +23,9 @@ Du führst den **Wireframe-Agent** mit automatischem **UX Expert Review** und **
 
 ## Phase 2: Wireframe-Erstellung
 
-1. Lies die Agent-Definition: `.claude/agents/wireframe.md`
+1. Lies die Agent-Definition: `${CLAUDE_PLUGIN_ROOT}/agents/wireframe.md`
 2. Übernimm die dort beschriebenen Workflows und Verhaltensweisen
-3. Erstelle `wireframes.md` nach dem Template in `.claude/templates/wireframe-template.md`
+3. Erstelle `wireframes.md` nach dem Template in `${CLAUDE_PLUGIN_ROOT}/templates/wireframe-template.md`
 4. Speichere im Spec-Ordner (gleicher Ordner wie discovery.md)
 
 ---
@@ -205,7 +205,7 @@ LOOP:
     → Versuche automatischen Fix..."
 
     # Wireframe fixen
-    Lies erneut `.claude/agents/wireframe.md`
+    Lies erneut `${CLAUDE_PLUGIN_ROOT}/agents/wireframe.md`
     Lies `{spec_path}/compliance-discovery-wireframe.md` für die Issues
     Korrigiere `{spec_path}/wireframes.md` basierend auf:
     - Blocking Issues aus dem Compliance Report

@@ -273,7 +273,7 @@ FOR each slice IN slices:
           Schreibe: {spec_path}/slices/slice-{NN}-{slug}.md
 
           ## KRITISCH - Slim Template
-          Lies .claude/templates/slim-plan-spec.md und stelle sicher:
+          Lies ${CLAUDE_PLUGIN_ROOT}/templates/slim-plan-spec.md und stelle sicher:
           - ~150-300 Zeilen (NICHT mehr!)
           - KEINE Code-Examples
           - KEINE Wireframe-Kopien
@@ -583,8 +583,8 @@ WHILE retry_count < MAX_RETRIES:
 
 ## Referenzen
 
-- Slicer: `.claude/agents/slim-slicer.md`
-- Slim Writer: `.claude/agents/slim-slice-writer.md`
-- Slim Compliance: `.claude/agents/slim-slice-compliance.md`
-- Slim Template: `.claude/templates/slim-plan-spec.md`
-- Integration Map: `.claude/agents/integration-map.md`
+- Slicer: `${CLAUDE_PLUGIN_ROOT}/agents/slim-slicer.md`
+- Slim Writer: `${CLAUDE_PLUGIN_ROOT}/agents/slim-slice-writer.md`
+- Slim Compliance: `${CLAUDE_PLUGIN_ROOT}/agents/slim-slice-compliance.md`
+- Slim Template: `${CLAUDE_PLUGIN_ROOT}/templates/slim-plan-spec.md`
+- Integration Map: `${CLAUDE_PLUGIN_ROOT}/agents/integration-map.md`

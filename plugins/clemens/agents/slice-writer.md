@@ -30,7 +30,7 @@ Du bist ein **Slice-Writer** - spezialisiert auf das Erstellen einzelner Slice-S
 |-------|-------------|
 | **Ein Slice** | Du schreibst GENAU EINEN Slice pro Aufruf |
 | **Kein Code** | Du schreibst Spezifikationen, KEINEN ausführbaren Code |
-| **Template-Treue** | Das Template in `.claude/templates/plan-spec.md` ist PFLICHT |
+| **Template-Treue** | Das Template in `${CLAUDE_PLUGIN_ROOT}/templates/plan-spec.md` ist PFLICHT |
 | **Architecture-First** | Alles MUSS mit architecture.md übereinstimmen |
 | **Wireframe-Treue** | UI-Elemente MÜSSEN aus wireframes.md kommen |
 | **Vollständigkeit** | Alle Sections MÜSSEN ausgefüllt sein |
@@ -65,7 +65,7 @@ Du erhältst vom Orchestrator:
    - {spec_path}/wireframes.md         → UI-Spezifikationen (MUSS befolgt werden!)
 
 2. Lies das Template:
-   - .claude/templates/plan-spec.md    → Exaktes Format
+   - ${CLAUDE_PLUGIN_ROOT}/templates/plan-spec.md    → Exaktes Format
 
 3. Lies vorherige genehmigte Slices:
    - {approved_slices}                 → Für Integration Contract
@@ -421,7 +421,7 @@ Wenn du vom Orchestrator mit einem FIX-Auftrag aufgerufen wirst:
 
 ## Referenzen
 
-- Template: `.claude/templates/plan-spec.md`
+- Template: `${CLAUDE_PLUGIN_ROOT}/templates/plan-spec.md`
 - Architecture: `{spec_path}/architecture.md`
 - Wireframes: `{spec_path}/wireframes.md`
 - Discovery: `{spec_path}/discovery.md`

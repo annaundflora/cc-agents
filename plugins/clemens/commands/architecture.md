@@ -30,7 +30,7 @@ Du führst den **Architecture-Agent** mit automatischer **Gate 1 Compliance** au
 
 ## Phase 2: Architecture-Erstellung
 
-1. Lies die Agent-Definition: `.claude/agents/architecture.md`
+1. Lies die Agent-Definition: `${CLAUDE_PLUGIN_ROOT}/agents/architecture.md`
 2. Übernimm die dort beschriebenen Workflows und Verhaltensweisen
 3. Führe den Architecture-Workflow durch:
    - 🔍 DIVERGE: Recherche (Codebase, Web, Git-History)
@@ -115,7 +115,7 @@ LOOP:
     → Versuche automatischen Fix..."
 
     # Architecture fixen
-    Lies erneut `.claude/agents/architecture.md`
+    Lies erneut `${CLAUDE_PLUGIN_ROOT}/agents/architecture.md`
     Lies `{spec_path}/compliance-architecture.md` für die Issues
     Korrigiere `{spec_path}/architecture.md` basierend auf:
     - Blocking Issues (Feature Mapping, Constraints)

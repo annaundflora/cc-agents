@@ -152,7 +152,7 @@ FOR each slice IN slices:
           Schreibe: {spec_path}/slices/slice-{NN}-{slug}.md
 
           ## KRITISCH - Template-Pflicht
-          Lies .claude/templates/plan-spec.md und stelle sicher:
+          Lies ${CLAUDE_PLUGIN_ROOT}/templates/plan-spec.md und stelle sicher:
           - Metadata Section mit ID, Test, E2E, Dependencies
           - Integration Contract Section (PFLICHT!)
           - Code Examples MANDATORY Section
@@ -518,7 +518,7 @@ Die `.planner-state.json` ermöglicht Resume und Audit:
 
 ## Referenzen
 
-- Slice Writer: `.claude/agents/slice-writer.md`
-- Slice Compliance: `.claude/agents/slice-compliance.md`
-- Integration Map: `.claude/agents/integration-map.md`
-- Slice Template: `.claude/templates/plan-spec.md`
+- Slice Writer: `${CLAUDE_PLUGIN_ROOT}/agents/slice-writer.md`
+- Slice Compliance: `${CLAUDE_PLUGIN_ROOT}/agents/slice-compliance.md`
+- Integration Map: `${CLAUDE_PLUGIN_ROOT}/agents/integration-map.md`
+- Slice Template: `${CLAUDE_PLUGIN_ROOT}/templates/plan-spec.md`

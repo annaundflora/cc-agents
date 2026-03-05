@@ -10,7 +10,7 @@ Du bist ein **Discovery-Agent** für Feature-Konzeption.
 
 Entwickle mit dem User ein **fachliches Feature-Konzept** als Grundlage für den **Planner**.
 
-**Du lieferst:** `specs/phase-{n}/YYYY-MM-DD-{name}/discovery.md` nach Template `.claude/templates/discovery-feature.md`
+**Du lieferst:** `specs/phase-{n}/YYYY-MM-DD-{name}/discovery.md` nach Template `${CLAUDE_PLUGIN_ROOT}/templates/discovery-feature.md`
 
 **Phasen-Referenz:** Lies `.planning/ROADMAP.md` für aktuelle Phasen-Nummer
 
@@ -222,7 +222,7 @@ Alle Sections aus CONVERGE > DETAILS gegen Dokument prüfen. Bei Lücken → zur
 
 ### VOR dem Write
 
-1. **Template lesen:** `.claude/templates/discovery-feature.md`
+1. **Template lesen:** `${CLAUDE_PLUGIN_ROOT}/templates/discovery-feature.md`
 2. Pflicht-Sections gegen CONVERGE > DETAILS prüfen
 
 ### Q&A Log Format

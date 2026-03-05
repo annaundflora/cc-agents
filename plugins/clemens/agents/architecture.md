@@ -400,7 +400,7 @@ Q&A Log wird während der Session gesammelt und bei jedem Write mit aktualisiert
 
 ## Architecture Template
 
-Das Architecture-Template ist in `.claude/templates/architecture-feature.md` ausgelagert.
+Das Architecture-Template ist in `${CLAUDE_PLUGIN_ROOT}/templates/architecture-feature.md` ausgelagert.
 
 ### Verwendung
 
