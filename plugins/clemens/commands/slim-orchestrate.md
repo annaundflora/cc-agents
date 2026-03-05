@@ -161,6 +161,20 @@ FOR each (file, stack_name) IN STACK_INDICATORS:
       detected_stack.typecheck_cmd = "mypy . 2>&1 || pyright . 2>&1"
       detected_stack.test_cmd = "pytest"
 
+    ELIF stack_name == "PHP":
+      # Laravel Pint (Lint/Format)
+      IF EXISTS "vendor/bin/pint" OR EXISTS "pint.json":
+        detected_stack.lint_autofix_cmd = "./vendor/bin/pint 2>&1"
+        detected_stack.lint_check_cmd = "./vendor/bin/pint --test 2>&1"
+      # PHPStan/Larastan (Static Analysis, optional)
+      IF EXISTS "vendor/bin/phpstan" OR EXISTS "phpstan.neon" OR EXISTS "phpstan.neon.dist":
+        detected_stack.typecheck_cmd = "./vendor/bin/phpstan analyse --no-progress 2>&1"
+      # Sail-aware test command
+      IF EXISTS "vendor/bin/sail":
+        detected_stack.test_cmd = "./vendor/bin/sail test"
+      ELSE:
+        detected_stack.test_cmd = "php artisan test"
+
     BREAK
 
 IF detected_stack != null:
@@ -226,9 +240,39 @@ FOR each wave IN waves:
 
       review_json = parse_agent_json(review_result)
 
-      IF review_json.verdict == "APPROVED" OR review_json.verdict == "CONDITIONAL":
-        OUTPUT: "Code Review: {review_json.verdict} (Iteration {review_retries + 1})"
+      IF review_json.verdict == "APPROVED":
+        OUTPUT: "Code Review: APPROVED (Iteration {review_retries + 1})"
         BREAK
+
+      IF review_json.verdict == "CONDITIONAL":
+        # Prüfe ob HIGH oder CRITICAL Findings vorliegen
+        high_findings = [f for f in review_json.findings if f.severity in ["CRITICAL", "HIGH"]]
+
+        IF len(high_findings) == 0:
+          OUTPUT: "Code Review: CONDITIONAL (keine HIGH/CRITICAL) — akzeptiert"
+          BREAK
+
+        # CONDITIONAL mit HIGH/CRITICAL → Auto-Fix (zählt NICHT als Retry)
+        OUTPUT: "Code Review: CONDITIONAL mit {len(high_findings)} HIGH/CRITICAL Findings → Auto-Fix..."
+
+        fix_impl_result = Task(
+          subagent_type: "slim-slice-implementer",
+          prompt: "
+            Fixe Code-Review-Findings für {slice_id}.
+            Review-Findings (NUR HIGH/CRITICAL): {high_findings}
+            Slice-Spec: {spec_file}
+            Architecture: {architecture_file}
+            Fixe NUR die HIGH und CRITICAL Findings. MEDIUM/LOW ignorieren.
+            Committe mit: git add -A && git commit -m 'fix({slice_id}): address HIGH code review findings'
+          "
+        )
+        impl_json = parse_agent_json(fix_impl_result)
+        # Nächste Review-Iteration prüft ob der Fix korrekt ist
+        review_retries++
+        IF review_retries >= MAX_REVIEW_RETRIES:
+          OUTPUT: "Code Review: CONDITIONAL HIGH-Fixes nach 3 Versuchen nicht gelöst — akzeptiere CONDITIONAL"
+          BREAK
+        CONTINUE
 
       IF review_json.verdict == "REJECTED":
         review_retries++
