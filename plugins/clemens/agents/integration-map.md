@@ -1,7 +1,7 @@
 ---
 name: integration-map
 description: "Gate 3: Integration Map Agent. Erstellt E2E-Validierung nach allen Slices. Outputs: integration-map.md, e2e-checklist.md, orchestrator-config.md"
-tools: Read, Write, Glob
+tools: Read, Write, Glob, Grep
 ---
 
 # Integration Map Agent (Gate 3)
@@ -172,6 +172,48 @@ Bevor der orchestrator-config.md geschrieben wird, prüfe ob die referenzierte R
      → Warnung in orchestrator-config.md
 ```
 
+#### H) Cross-Slice Semantic Consistency
+
+Geht über strukturelle Connection-Checks hinaus und prüft ob Lösungsstrategien über Slice-Grenzen hinweg aufgehen.
+
+```
+1. MODIFY-Chain Analysis:
+   - Finde alle Dateien die von MEHREREN Slices modifiziert werden
+     (z.B. TimeRulesAdapter in Slice 06 + 07, FixDatesService in Slice 08)
+   - Für jede solche Datei: Sammle ALLE Methoden die über die Slices hinweg hinzugefügt werden
+   - Prüfe: Decken die Methoden des Provider-Slice ALLE Patterns ab die Consumer-Slices brauchen?
+   - Beispiel: Slice 07 stellt convertToLegacy() bereit, aber Slice 08+10 brauchen auch convertToDates()
+     → GAP wenn convertToDates() in keinem Slice als Output definiert ist
+
+2. Wrapper/Extension Feasibility:
+   - Finde Slices deren Deliverables "extends", "implements" oder "wraps" auf Klassen
+     aus anderen Slices spezifizieren
+   - Prüfe: Ist die Lösungsstrategie KONKRET (nicht "Wrapper oder Extension")?
+   - Prüfe: Ist die Parent-Klasse/Interface als Output eines vorherigen Slice definiert?
+   - Prüfe: Sind überschriebene Methoden im Slice-Constraint spezifiziert?
+   - Bei vager Strategie → ❌ GAP: "Slice {NN} spezifiziert '{vage Beschreibung}' —
+     konkrete Strategie fehlt (welche Klasse, welche Methoden überschrieben)"
+
+3. Return-Type Consistency über Consumer-Chains:
+   - Für Methoden die in "Provides To" an 2+ Consumer-Slices gehen:
+     Sammle ALLE Call-Patterns aus allen Consumer-Slice ACs
+     (z.B. Consumer A nutzt ->toJson(), Consumer B nutzt ->getDates())
+   - Prüfe: Deckt der Provider-Slice-Output ALLE genutzten Call-Patterns ab?
+   - Prüfe: Sind Return-Types über die Chain konsistent?
+     (z.B. Methode gibt ZipmendDateValidation zurück, aber Consumer erwartet Carbon-Objekte)
+   - Bei Lücke → ❌ GAP: "Methode '{method}' in Slice {NN} wird von {consumers} konsumiert,
+     aber Call-Pattern '{pattern}' hat kein AC im Provider-Slice"
+```
+
+**Typische Semantic Gaps:**
+
+| Gap-Typ | Beispiel | Prüfung |
+|---------|----------|---------|
+| Fehlende Konvertierungs-Methode | convertToLegacy() existiert, convertToDates() fehlt | Alle Consumer-Call-Patterns gegen Provider-Outputs |
+| Vage Wrapper-Strategie | "Extension oder Wrapper" ohne konkrete Empfehlung | Constraints-Section auf konkrete Klassen-/Methoden-Nennung |
+| Return-Type Mismatch | Provider gibt Array zurück, Consumer erwartet Carbon | Return-Type Spec gegen Consumer-AC-Assertions |
+| Unvollständige Method-Surface | Adapter hat 2 Methoden, Consumer braucht 3 | Alle "Requires From" Methoden gegen Provider "Provides To" |
+
 ### Phase 4: Output generieren
 
 Erstelle drei Dateien:
@@ -279,6 +321,12 @@ All declared dependencies have matching outputs.
 |-----------|-------------|----------------|--------------|--------|
 | [flow] | [where it breaks] | [full chain] | [missing piece] | [fix] |
 
+### ❌ Semantic Consistency Gaps: {N}
+
+| Gap Type | Provider Slice | Consumer Slices | Missing | Action |
+|----------|---------------|-----------------|---------|--------|
+| [type] | Slice X | Slice Y, Z | [what's missing] | [fix] |
+
 ---
 
 ## Discovery Traceability
@@ -326,6 +374,7 @@ All declared dependencies have matching outputs.
 | Valid Connections | {N} |
 | Orphaned Outputs | {N} |
 | Missing Inputs | {N} |
+| Semantic Consistency Gaps | {N} |
 
 **Verdict:** ✅ READY FOR ORCHESTRATION / ❌ GAPS FOUND
 ```
@@ -529,6 +578,7 @@ During implementation:
 - Discovery Element ohne Slice → Slice muss ergänzt oder erweitert werden
 - Deliverable-Consumer Gap → Component ohne Mount-Point in Consumer-Page → Slice-Deliverables erweitern
 - Runtime Path Gap → User-Flow bricht ab weil ein Trigger/Proxy/Aufruf fehlt → Slice-Spec um fehlenden Trigger erweitern
+- Semantic Consistency Gap → Lösungsstrategie über Slice-Grenzen inkonsistent (fehlende Methode, vage Wrapper-Strategie, Return-Type Mismatch) → Betroffene Slice-Specs konkretisieren
 
 ## Dateipfad-Konvention
 
