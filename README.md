@@ -1,19 +1,19 @@
-# product-cyber Marketplace
+# annaundflora Marketplace
 
-Claude Code Marketplace fuer das zipmend Hackathon-Team.
+Claude Code Plugin-Marketplace.
 
 ## Quick Start
 
 ```bash
 # Marketplace hinzufuegen
-/plugin marketplace add product-cyber/marketplace
+/plugin marketplace add annaundflora/marketplace
 
 # Alle Plugins anzeigen
 /plugin
 
 # Plugin installieren
-/plugin install clemens@product-cyber
-/plugin install florentin@product-cyber
+/plugin install clemens@annaundflora
+/plugin install florentin@annaundflora
 ```
 
 ## Plugins
@@ -90,4 +90,4 @@ Analysis  Research   Pipeline  + Safeguards
 1. Ordner `plugins/dein-name/` mit `.claude-plugin/plugin.json`, `agents/`, `commands/`, `skills/`
 2. In `.claude-plugin/marketplace.json` registrieren
 3. Push: `git add . && git commit -m "Add plugin: dein-name" && git push`
-4. Update: `/plugin marketplace update product-cyber`
+4. Update: `/plugin marketplace update annaundflora`
