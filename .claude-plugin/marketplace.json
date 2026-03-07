@@ -1,11 +1,11 @@
 {
-  "name": "product-cyber",
+  "name": "annaundflora",
   "owner": {
-    "name": "product-cyber",
+    "name": "annaundflora",
     "email": "claude-clemens@zipmend.com"
   },
   "metadata": {
-    "description": "zipmend Hackathon Marketplace - Multi-Agent Development Toolkit",
+    "description": "CC Agent Pipeline - Multi-Agent Development Toolkit",
     "version": "1.0.0",
     "pluginRoot": "./plugins"
   },
@@ -27,25 +27,6 @@
         "testing",
         "strategy",
         "quality-gates"
-      ]
-    },
-    {
-      "name": "florentin",
-      "source": "./plugins/florentin",
-      "description": "Florentins Laravel-Analyse-Toolkit: Characterization Testing, Eloquent Patterns, Logic Archaeology, Systematic Debugging, Architecture Impact. 16 Agents, 5 Safeguards, 9 Commands, 5 Skills.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Florentin",
-        "email": "florentin@zipmend.com"
-      },
-      "keywords": [
-        "laravel",
-        "refactoring",
-        "analysis",
-        "testing",
-        "debugging",
-        "archaeology",
-        "safeguards"
       ]
     }
   ]
