@@ -3,16 +3,17 @@
  * conflict-scanner.js
  *
  * Slice 02 — Entity-Extraktion & Claims
- * Modules: CLI Parser | Entity Extractor | Claims Writer
+ * Slice 03 — GitHub Registry, Overlap & Report
+ * Modules: CLI Parser | Entity Extractor | Claims Writer |
+ *          Session Registry | Overlap Calculator | Report Writer | Exit Handler
  *
  * Usage:
  *   node conflict-scanner.js --branch <branch> --spec-path <path> --repo <owner/repo> [--weave]
  *
  * Exit codes:
- *   0  — Success (claims.json written)
- *   2  — Error (invalid args, git/weave failure)
- *
- * Note: Exit code 1 (overlap found) is NOT part of this slice — that is Slice 03.
+ *   0  — No overlaps found
+ *   1  — Overlaps found
+ *   2  — Error (invalid args, git/gh failure)
  */
 
 'use strict';
@@ -20,6 +21,7 @@
 const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // ---------------------------------------------------------------------------
 // MODULE 1: CLI Parser
@@ -420,6 +422,440 @@ function writeClaims(specPath, entities) {
 }
 
 // ---------------------------------------------------------------------------
+// MODULE 4: Session Registry
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that the gh CLI is available and authenticated.
+ * Exits with code 2 and writes to stderr if not.
+ */
+function assertGhAuth() {
+  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8' });
+  if (result.error || result.status !== 0) {
+    process.stderr.write('GitHub CLI not authenticated\n');
+    process.exit(2);
+  }
+}
+
+/**
+ * Build the GitHub Issue body per architecture.md "Schema Details: GitHub Issue Body".
+ *
+ * @param {string} sessionId
+ * @param {string} feature
+ * @param {string} branch
+ * @param {string} specPath
+ * @param {string} startedAt  — ISO 8601
+ * @param {Object} claims     — { entities_changed, summary }
+ * @returns {string}
+ */
+function buildIssueBody(sessionId, feature, branch, specPath, startedAt, claims) {
+  const sessionBlock = JSON.stringify(
+    {
+      session_id: sessionId,
+      feature,
+      branch,
+      spec_path: specPath,
+      started_at: startedAt,
+    },
+    null,
+    2
+  );
+
+  const claimsBlock = JSON.stringify(
+    {
+      entities_changed: claims.entities_changed,
+      summary: claims.summary,
+    },
+    null,
+    2
+  );
+
+  return `## Session\n\n\`\`\`json\n${sessionBlock}\n\`\`\`\n\n## Entity Claims\n\n\`\`\`json\n${claimsBlock}\n\`\`\``;
+}
+
+/**
+ * Derive a human-readable feature name from the branch name.
+ * e.g. "feature/workspace-redesign" → "workspace-redesign"
+ *
+ * @param {string} branch
+ * @returns {string}
+ */
+function featureFromBranch(branch) {
+  // Strip common prefixes like "feature/", "feat/", etc.
+  return branch.replace(/^(?:feature|feat|fix|chore|refactor)\//, '');
+}
+
+/**
+ * Create a GitHub Issue for this pipeline session and return the issue number.
+ *
+ * @param {string} repo
+ * @param {string} feature
+ * @param {string} body
+ * @returns {number}  — issue number
+ */
+function createIssue(repo, feature, body) {
+  const result = spawnSync(
+    'gh',
+    [
+      'issue', 'create',
+      '--repo', repo,
+      '--title', `Pipeline: ${feature}`,
+      '--label', 'pipeline:running',
+      '--body', body,
+    ],
+    { encoding: 'utf8' }
+  );
+
+  if (result.error || result.status !== 0) {
+    const stderr = (result.stderr || '').trim();
+    process.stderr.write(`Error creating GitHub issue: ${stderr}\n`);
+    process.exit(2);
+  }
+
+  // gh issue create prints the URL of the created issue, e.g.:
+  //   https://github.com/owner/repo/issues/42
+  const stdout = (result.stdout || '').trim();
+  const m = stdout.match(/\/issues\/(\d+)$/);
+  if (m) {
+    return parseInt(m[1], 10);
+  }
+
+  // Fallback: try to parse a bare issue number
+  const num = parseInt(stdout, 10);
+  if (!isNaN(num)) return num;
+
+  // Cannot determine issue number — return 0 (non-fatal for overlap detection)
+  process.stderr.write(`Warning: could not parse issue number from gh output: ${stdout}\n`);
+  return 0;
+}
+
+/**
+ * List all open issues with label "pipeline:running" and return their parsed
+ * entity-claims (excluding our own issue).
+ *
+ * Invalid JSON bodies are skipped with a stderr warning (AC-3).
+ *
+ * @param {string} repo
+ * @param {number} ownIssueNumber  — exclude this issue from results
+ * @returns {Array<{ issueNumber: number, feature: string, user: string, entities_changed: Array, summary: Object }>}
+ */
+function readOtherSessions(repo, ownIssueNumber) {
+  const result = spawnSync(
+    'gh',
+    [
+      'issue', 'list',
+      '--repo', repo,
+      '--label', 'pipeline:running',
+      '--limit', '100',
+      '--json', 'number,title,body',
+    ],
+    { encoding: 'utf8' }
+  );
+
+  if (result.error || result.status !== 0) {
+    const stderr = (result.stderr || '').trim();
+    process.stderr.write(`Warning: gh issue list failed: ${stderr}\n`);
+    return [];
+  }
+
+  let issues;
+  try {
+    issues = JSON.parse(result.stdout || '[]');
+  } catch (_) {
+    process.stderr.write('Warning: could not parse gh issue list output\n');
+    return [];
+  }
+
+  const sessions = [];
+
+  for (const issue of issues) {
+    if (issue.number === ownIssueNumber) continue;
+
+    const body = issue.body || '';
+
+    // Extract the Entity Claims JSON block from the issue body
+    // Format: ## Entity Claims\n\n```json\n{...}\n```
+    const claimsBlockMatch = body.match(
+      /##\s+Entity Claims[\s\S]*?```json\s*([\s\S]*?)```/i
+    );
+
+    if (!claimsBlockMatch) {
+      process.stderr.write(`Skipping issue #${issue.number}: invalid JSON\n`);
+      continue;
+    }
+
+    let claims;
+    try {
+      claims = JSON.parse(claimsBlockMatch[1]);
+    } catch (_) {
+      process.stderr.write(`Skipping issue #${issue.number}: invalid JSON\n`);
+      continue;
+    }
+
+    if (!claims || !Array.isArray(claims.entities_changed)) {
+      process.stderr.write(`Skipping issue #${issue.number}: invalid JSON\n`);
+      continue;
+    }
+
+    // Extract session info for feature name + user
+    let sessionFeature = issue.title.replace(/^Pipeline:\s*/, '').trim();
+    let sessionUser = '';
+
+    const sessionBlockMatch = body.match(
+      /##\s+Session[\s\S]*?```json\s*([\s\S]*?)```/i
+    );
+    if (sessionBlockMatch) {
+      try {
+        const sessionData = JSON.parse(sessionBlockMatch[1]);
+        if (sessionData.feature) sessionFeature = sessionData.feature;
+      } catch (_) {
+        // ignore — sessionFeature already set from title
+      }
+    }
+
+    sessions.push({
+      issueNumber: issue.number,
+      feature: sessionFeature,
+      user: sessionUser,
+      entities_changed: claims.entities_changed,
+      summary: claims.summary || {},
+    });
+  }
+
+  return sessions;
+}
+
+/**
+ * Register session on GitHub: authenticate, create issue, read other sessions.
+ *
+ * @param {string} repo
+ * @param {string} sessionId
+ * @param {string} feature
+ * @param {string} branch
+ * @param {string} specPath
+ * @param {string} startedAt
+ * @param {Object} claims
+ * @returns {{ ownIssueNumber: number, otherSessions: Array }}
+ */
+function registerSession(repo, sessionId, feature, branch, specPath, startedAt, claims) {
+  // AC-1: Check gh auth before creating any issue
+  assertGhAuth();
+
+  // AC-2: Create issue with correct title, label, and body
+  const body = buildIssueBody(sessionId, feature, branch, specPath, startedAt, claims);
+  const ownIssueNumber = createIssue(repo, feature, body);
+
+  // AC-3: Read other sessions, skip invalid JSON
+  const otherSessions = readOtherSessions(repo, ownIssueNumber);
+
+  return { ownIssueNumber, otherSessions };
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 5: Overlap Calculator
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute overlaps between our entities and other sessions' entities.
+ * Implements the deterministic algorithm from architecture.md
+ * "Overlap-Berechnung (deterministisch)".
+ *
+ * @param {Array} ownEntities        — from claims.json
+ * @param {Array} otherSessions      — from readOtherSessions()
+ * @returns {Array<{ file, our_entity, their_entity, their_issue, their_feature, their_user, overlap_type, severity }>}
+ */
+function calculateOverlaps(ownEntities, otherSessions) {
+  const overlaps = [];
+
+  for (const ownEntity of ownEntities) {
+    for (const otherSession of otherSessions) {
+      for (const theirEntity of (otherSession.entities_changed || [])) {
+        if (ownEntity.file === theirEntity.file) {
+          let overlap_type;
+          let severity;
+
+          // AC-4: same file AND same non-null entity → high
+          if (
+            ownEntity.entity === theirEntity.entity &&
+            ownEntity.entity !== null
+          ) {
+            overlap_type = 'same_entity';
+            severity = 'high';
+          } else {
+            // AC-5: same file, different entity (or null entity)
+            overlap_type = 'same_file_different_entity';
+            severity = 'low';
+          }
+
+          overlaps.push({
+            file: ownEntity.file,
+            our_entity: ownEntity.entity,
+            their_entity: theirEntity.entity,
+            their_issue: otherSession.issueNumber,
+            their_feature: otherSession.feature,
+            their_user: otherSession.user || '',
+            overlap_type,
+            severity,
+          });
+        }
+      }
+    }
+  }
+
+  return overlaps;
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 6: Report Writer
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute overlap-specific summary fields.
+ *
+ * @param {Array} overlaps
+ * @returns {{ overlapping_files: number, overlapping_entities: number, max_severity: string }}
+ */
+function buildOverlapSummary(overlaps) {
+  if (overlaps.length === 0) {
+    return { overlapping_files: 0, overlapping_entities: 0, max_severity: 'none' };
+  }
+
+  const overlappingFiles = new Set(overlaps.map((o) => o.file));
+  const overlappingEntities = new Set(
+    overlaps.map((o) => `${o.file}:${o.our_entity}`).filter((k) => !k.endsWith(':null'))
+  );
+
+  const hasHigh = overlaps.some((o) => o.severity === 'high');
+  const maxSeverity = hasHigh ? 'high' : 'low';
+
+  return {
+    overlapping_files: overlappingFiles.size,
+    overlapping_entities: overlappingEntities.size,
+    max_severity: maxSeverity,
+  };
+}
+
+/**
+ * Parse weave-cli preview output into a weave_validation object.
+ * Returns null if weave output is unavailable or unparseable.
+ *
+ * @param {string|null} weaveOutput
+ * @returns {{ auto_resolvable: boolean, conflict_entities: string[], confidence: string }|null}
+ */
+function parseWeaveValidation(weaveOutput) {
+  if (!weaveOutput || weaveOutput.trim().length === 0) return null;
+
+  const conflictEntities = [];
+  let hasConflicts = false;
+
+  for (const line of weaveOutput.split('\n')) {
+    // Look for conflict markers in weave output
+    const conflictMatch = line.match(/conflict[:\s]+([A-Za-z_][A-Za-z0-9_]*)/i);
+    if (conflictMatch) {
+      hasConflicts = true;
+      conflictEntities.push(conflictMatch[1]);
+    }
+  }
+
+  const auto_resolvable = !hasConflicts;
+
+  // Confidence heuristic based on output length and structure
+  let confidence = 'low';
+  const lineCount = weaveOutput.split('\n').filter((l) => l.trim().length > 0).length;
+  if (lineCount > 10) confidence = 'high';
+  else if (lineCount > 3) confidence = 'medium';
+
+  return {
+    auto_resolvable,
+    conflict_entities: conflictEntities,
+    confidence,
+  };
+}
+
+/**
+ * Write overlap-report.json to the spec-path directory.
+ *
+ * @param {string} specPath
+ * @param {string} sessionId
+ * @param {string} feature
+ * @param {string} branch
+ * @param {string} scanTimestamp
+ * @param {Array}  entitiesChanged      — from claims.json (without isNewFile)
+ * @param {Object} claimsSummary        — { files_changed, entities_changed, new_files }
+ * @param {Array}  overlaps
+ * @param {string|null} weaveOutput     — raw weave-cli preview output or null
+ * @returns {string}  — path to the written file
+ */
+function writeReport(
+  specPath,
+  sessionId,
+  feature,
+  branch,
+  scanTimestamp,
+  entitiesChanged,
+  claimsSummary,
+  overlaps,
+  weaveOutput
+) {
+  const overlapSummary = buildOverlapSummary(overlaps);
+  const weaveValidation = parseWeaveValidation(weaveOutput);
+
+  const report = {
+    session_id: sessionId,
+    feature,
+    branch,
+    scan_timestamp: scanTimestamp,
+    entities_changed: entitiesChanged,
+    overlaps,
+    weave_validation: weaveValidation,
+    summary: {
+      files_changed: claimsSummary.files_changed,
+      entities_changed: claimsSummary.entities_changed,
+      new_files: claimsSummary.new_files,
+      overlapping_files: overlapSummary.overlapping_files,
+      overlapping_entities: overlapSummary.overlapping_entities,
+      max_severity: overlapSummary.max_severity,
+    },
+  };
+
+  const reportPath = path.join(specPath, 'overlap-report.json');
+  try {
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
+  } catch (err) {
+    process.stderr.write(`Error writing overlap-report.json: ${err.message}\n`);
+    process.exit(2);
+  }
+
+  return reportPath;
+}
+
+// ---------------------------------------------------------------------------
+// MODULE 7: Exit Handler
+// ---------------------------------------------------------------------------
+
+/**
+ * Write a JSON summary to stdout and exit with the appropriate code.
+ *
+ * @param {string} reportPath
+ * @param {number} ownIssueNumber
+ * @param {Array}  overlaps
+ * @param {Object} summary
+ */
+function exitWithResult(reportPath, ownIssueNumber, overlaps, summary) {
+  const exitCode = overlaps.length > 0 ? 1 : 0;
+
+  const output = {
+    status: exitCode === 0 ? 'no_overlaps' : 'overlaps_found',
+    overlap_report_path: reportPath,
+    own_issue_number: ownIssueNumber,
+    summary,
+  };
+
+  process.stdout.write(JSON.stringify(output, null, 2) + '\n');
+  process.exit(exitCode);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -427,27 +863,89 @@ function main() {
   // Step 1: Parse and validate CLI args
   const { branch, specPath, repo, useWeave } = parseArgs();
 
-  // Step 2: Extract entities
-  const entities = extractEntities(branch, useWeave);
+  const sessionId = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  const feature = featureFromBranch(branch);
+
+  // Step 2: Extract entities (optionally using weave-cli)
+  let weaveOutput = null;
+  let entities = null;
+
+  if (useWeave) {
+    // Try weave-cli preview; capture raw output for weave_validation
+    const weaveResult = spawnSync('weave-cli', ['preview', 'main'], { encoding: 'utf8' });
+    if (!weaveResult.error && weaveResult.status === 0) {
+      weaveOutput = weaveResult.stdout || '';
+      // Also attempt structured parse for entity extraction
+      const weaveEntities = runWeavePreview();
+      if (weaveEntities !== null) {
+        entities = weaveEntities;
+      }
+    } else {
+      process.stderr.write(
+        'Warning: weave-cli not available or failed, falling back to git diff parsing\n'
+      );
+    }
+  }
+
+  if (entities === null) {
+    const diffOutput = runGitDiff(branch);
+    entities = parseDiffHunks(diffOutput);
+  }
+
+  // Apply Top-50 cap (GitHub Issue Body Limit)
+  if (entities.length > 50) {
+    entities = entities.slice(0, 50);
+  }
 
   // Step 3: Write claims.json
   const claimsPath = writeClaims(specPath, entities);
+  const claimsSummary = buildSummary(entities);
 
-  const summary = buildSummary(entities);
+  // Strip internal isNewFile flag for output
+  const entitiesForOutput = entities.map(({ isNewFile: _dropped, ...rest }) => rest);
 
-  // Slice 03 will extend this script with GitHub registry, overlap calculation,
-  // report writing, and final exit code logic. For now we output the summary
-  // and exit 0 to indicate successful claims extraction.
-  const output = {
-    status: 'claims_written',
-    claims_path: claimsPath,
-    repo,
-    branch,
-    summary,
+  // Step 4: Session Registry — authenticate, create issue, read other sessions
+  const scanTimestamp = new Date().toISOString();
+
+  const claims = {
+    entities_changed: entitiesForOutput,
+    summary: claimsSummary,
   };
 
-  process.stdout.write(JSON.stringify(output, null, 2) + '\n');
-  process.exit(0);
+  const { ownIssueNumber, otherSessions } = registerSession(
+    repo,
+    sessionId,
+    feature,
+    branch,
+    specPath,
+    startedAt,
+    claims
+  );
+
+  // Step 5: Overlap Calculator
+  const overlaps = calculateOverlaps(entitiesForOutput, otherSessions);
+
+  // Step 6: Report Writer
+  const reportPath = writeReport(
+    specPath,
+    sessionId,
+    feature,
+    branch,
+    scanTimestamp,
+    entitiesForOutput,
+    claimsSummary,
+    overlaps,
+    weaveOutput
+  );
+
+  // Step 7: Exit Handler
+  exitWithResult(reportPath, ownIssueNumber, overlaps, {
+    ...claimsSummary,
+    overlapping_files: buildOverlapSummary(overlaps).overlapping_files,
+    overlapping_entities: buildOverlapSummary(overlaps).overlapping_entities,
+    max_severity: buildOverlapSummary(overlaps).max_severity,
+  });
 }
 
 main();
