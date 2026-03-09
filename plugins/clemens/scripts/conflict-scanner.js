@@ -267,13 +267,14 @@ function runGitDiff(branch) {
 }
 
 /**
- * Try to run `weave-cli preview main` and parse its output as entity list.
- * Returns null if weave-cli is not available (AC-8: fallback to git diff).
+ * Try to run `weave-cli preview main` once and return both the raw output
+ * and the parsed entity list.
+ * Returns null for both fields if weave-cli is not available (AC-8: fallback to git diff).
  *
  * weave-cli has no --json flag (documented limitation). We parse text output
  * looking for file/entity references in the preview output.
  *
- * @returns {Array<{ file: string, entity: string|null, entity_type: string, lines: [number, number], diff_summary: string, isNewFile: boolean }>|null}
+ * @returns {{ rawOutput: string, entities: Array<{ file: string, entity: string|null, entity_type: string, lines: [number, number], diff_summary: string, isNewFile: boolean }>|null }}
  */
 function runWeavePreview() {
   const weaveResult = spawnSync('weave-cli', ['preview', 'main'], { encoding: 'utf8' });
@@ -282,16 +283,16 @@ function runWeavePreview() {
     process.stderr.write(
       'Warning: weave-cli not available or failed, falling back to git diff parsing\n'
     );
-    return null;
+    return { rawOutput: null, entities: null };
   }
-  let weaveOutput = weaveResult.stdout || '';
+  const rawOutput = weaveResult.stdout || '';
 
   // Parse weave-cli text output.
   // Expected format (weave v0.2.3): lines like
   //   "file: src/foo.ts  entity: myFunction  type: function  status: modified"
   // or tabular output. We do a best-effort parse.
   const result = [];
-  const lines = weaveOutput.split('\n');
+  const lines = rawOutput.split('\n');
 
   for (const line of lines) {
     // Try structured line: "file: <f>  entity: <e>  type: <t>"
@@ -324,14 +325,14 @@ function runWeavePreview() {
   }
 
   // If weave produced output but we couldn't parse any entities, fall back
-  if (result.length === 0 && weaveOutput.trim().length > 0) {
+  if (result.length === 0 && rawOutput.trim().length > 0) {
     process.stderr.write(
       'Warning: weave-cli output could not be parsed, falling back to git diff parsing\n'
     );
-    return null;
+    return { rawOutput, entities: null };
   }
 
-  return result.length > 0 ? result : null;
+  return { rawOutput, entities: result.length > 0 ? result : null };
 }
 
 /**
@@ -346,8 +347,8 @@ function extractEntities(branch, useWeave) {
   let hunks = null;
 
   if (useWeave) {
-    hunks = runWeavePreview();
-    // null means fallback to git diff (AC-8)
+    const { entities } = runWeavePreview();
+    hunks = entities; // null means fallback to git diff (AC-8)
   }
 
   if (hunks === null) {
@@ -867,25 +868,16 @@ function main() {
   const startedAt = new Date().toISOString();
   const feature = featureFromBranch(branch);
 
-  // Step 2: Extract entities (optionally using weave-cli)
+  // Step 2: Extract entities (optionally using weave-cli).
+  // weave-cli is invoked AT MOST ONCE: runWeavePreview() returns both the raw
+  // output (for weave_validation) and the parsed entities in a single call.
   let weaveOutput = null;
   let entities = null;
 
   if (useWeave) {
-    // Try weave-cli preview; capture raw output for weave_validation
-    const weaveResult = spawnSync('weave-cli', ['preview', 'main'], { encoding: 'utf8' });
-    if (!weaveResult.error && weaveResult.status === 0) {
-      weaveOutput = weaveResult.stdout || '';
-      // Also attempt structured parse for entity extraction
-      const weaveEntities = runWeavePreview();
-      if (weaveEntities !== null) {
-        entities = weaveEntities;
-      }
-    } else {
-      process.stderr.write(
-        'Warning: weave-cli not available or failed, falling back to git diff parsing\n'
-      );
-    }
+    const { rawOutput, entities: weaveEntities } = runWeavePreview();
+    weaveOutput = rawOutput;   // may be null if weave-cli was unavailable
+    entities = weaveEntities;  // null triggers git diff fallback below
   }
 
   if (entities === null) {
