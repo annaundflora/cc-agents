@@ -80,6 +80,7 @@ function parseArgs() {
   }
 
   // Validate --spec-path: directory must exist
+  const specPathRelative = args.specPath; // keep the original relative (or absolute) path as provided by the caller
   const resolvedSpecPath = path.resolve(args.specPath);
   if (!fs.existsSync(resolvedSpecPath) || !fs.statSync(resolvedSpecPath).isDirectory()) {
     process.stderr.write(
@@ -98,7 +99,8 @@ function parseArgs() {
 
   return {
     branch: args.branch,
-    specPath: resolvedSpecPath,
+    specPath: resolvedSpecPath,       // absolute path — used for all fs operations
+    specPathRelative,                  // original path as supplied — used in GitHub Issue body
     repo: args.repo,
     useWeave: Boolean(args.useWeave),
   };
@@ -862,7 +864,7 @@ function exitWithResult(reportPath, ownIssueNumber, overlaps, summary) {
 
 function main() {
   // Step 1: Parse and validate CLI args
-  const { branch, specPath, repo, useWeave } = parseArgs();
+  const { branch, specPath, specPathRelative, repo, useWeave } = parseArgs();
 
   const sessionId = crypto.randomUUID();
   const startedAt = new Date().toISOString();
@@ -910,7 +912,7 @@ function main() {
     sessionId,
     feature,
     branch,
-    specPath,
+    specPathRelative,  // relative path only — never expose absolute fs paths in public issues
     startedAt,
     claims
   );
