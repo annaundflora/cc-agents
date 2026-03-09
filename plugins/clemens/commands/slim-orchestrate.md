@@ -113,6 +113,14 @@ IF EXISTS STATE_FILE:
   # Lies GATE_LOG falls vorhanden um bereits bestandene Gates zu kennen.
   # Format pro Zeile: {"ts":...,"slice":"slice-02","gate":"code_review","verdict":"APPROVED",...}
   # Nutze dies um Gates zu überspringen die bereits PASSED/APPROVED sind.
+
+# Worktree-Erstellung (idempotent)
+worktree_check = Bash("git worktree list")
+IF NOT "worktrees/{feature_name}" IN worktree_check.output:
+  Bash("git worktree add worktrees/{feature_name} -b feature/{feature_name}")
+state.worktree_path = "worktrees/{feature_name}"
+state.branch = "feature/{feature_name}"
+Write(STATE_FILE, state)
 ```
 
 ---
@@ -482,6 +490,10 @@ IF final_json.overall_status == "failed":
 ```
 state.current_state = "feature_complete"
 # Feature Evidence, Branch Info, Nächste Schritte
+
+# Worktree Cleanup (nach erfolgreicher Pipeline)
+# git worktree remove worktrees/{feature_name}
+# git worktree prune
 ```
 
 ---
