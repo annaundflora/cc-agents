@@ -62,7 +62,21 @@ weave-driver --version
 The `gh` CLI is used by `conflict-scanner.js` to create and read GitHub Issues
 for the session registry.
 
-Install: https://cli.github.com (package manager recommended — see site for your OS)
+Install via your package manager (choose the command for your OS):
+
+```bash
+# macOS
+brew install gh
+
+# Linux — Debian/Ubuntu
+sudo apt install gh
+
+# Linux — Fedora/RHEL/CentOS
+sudo dnf install gh
+
+# Windows
+winget install --id GitHub.cli
+```
 
 After installation, authenticate:
 
