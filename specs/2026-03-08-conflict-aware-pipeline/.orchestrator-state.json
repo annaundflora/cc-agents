@@ -1,0 +1,20 @@
+{
+  "spec_path": "specs/2026-03-08-conflict-aware-pipeline",
+  "feature_name": "conflict-aware-pipeline",
+  "status": "in_progress",
+  "current_state": "implementing",
+  "current_slice_id": "wave-2-parallel",
+  "retry_count": 0,
+  "failed_stage": null,
+  "waves": [
+    {"wave": 1, "slices": ["slice-01", "slice-02"]},
+    {"wave": 2, "slices": ["slice-03", "slice-04"]},
+    {"wave": 3, "slices": ["slice-05", "slice-07"]},
+    {"wave": 4, "slices": ["slice-06"]}
+  ],
+  "completed_slices": ["slice-01", "slice-02"],
+  "evidence_files": [
+    ".claude/evidence/conflict-aware-pipeline/slice-01.json",
+    ".claude/evidence/conflict-aware-pipeline/slice-02.json"
+  ]
+}

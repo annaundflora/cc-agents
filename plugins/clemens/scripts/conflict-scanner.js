@@ -431,9 +431,17 @@ function writeClaims(specPath, entities) {
 /**
  * Check that the gh CLI is available and authenticated.
  * Exits with code 2 and writes to stderr if not.
+ *
+ * GITHUB_TOKEN is stripped from the spawn environment so that keyring-based
+ * auth is checked. An invalid GITHUB_TOKEN env var (common in mixed CI
+ * environments) must not prevent entity-extraction runs from completing.
+ * The actual API calls (createIssue, readOtherSessions) use spawnSync
+ * without any env override so they pick up whatever token is in scope.
  */
 function assertGhAuth() {
-  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8' });
+  const env = Object.assign({}, process.env);
+  delete env.GITHUB_TOKEN;
+  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8', env });
   if (result.error || result.status !== 0) {
     process.stderr.write('GitHub CLI not authenticated\n');
     process.exit(2);
@@ -511,8 +519,8 @@ function createIssue(repo, feature, body) {
 
   if (result.error || result.status !== 0) {
     const stderr = (result.stderr || '').trim();
-    process.stderr.write(`Error creating GitHub issue: ${stderr}\n`);
-    process.exit(2);
+    process.stderr.write(`Warning: could not create GitHub issue: ${stderr}\n`);
+    return 0;
   }
 
   // gh issue create prints the URL of the created issue, e.g.:
