@@ -17,7 +17,7 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -238,27 +238,30 @@ function parseDiffHunks(diffOutput) {
 
 /**
  * Run `git diff main...{branch} --unified=0` and return the output.
+ * Uses spawnSync with an argument array so the branch name is never
+ * interpreted by the shell — prevents shell injection regardless of
+ * characters in the branch name.
  * Exits with code 2 on failure.
  *
  * @param {string} branch
  * @returns {string}
  */
 function runGitDiff(branch) {
-  // Shell-safe branch argument: we validate format above, but use array form via
-  // execSync with shell:false equivalent by passing as a single string with escaping.
-  // Node's execSync passes through shell on Windows; sanitize branch name.
-  const safeBranch = branch.replace(/[`$\\"|&;<>(){}]/g, '');
-  const cmd = `git diff main...${safeBranch} --unified=0`;
-  try {
-    const output = execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf8' });
-    return output;
-  } catch (err) {
-    // git diff exits non-zero only on real errors (e.g. unknown revision)
-    // A diff with no changes exits 0.
-    const stderr = err.stderr ? err.stderr.toString() : '';
-    process.stderr.write(`Error running git diff: ${stderr || err.message}\n`);
+  const result = spawnSync('git', ['diff', `main...${branch}`, '--unified=0'], {
+    encoding: 'utf8',
+  });
+  if (result.error) {
+    process.stderr.write(`Error running git diff: ${result.error.message}\n`);
     process.exit(2);
   }
+  if (result.status !== 0) {
+    // git diff exits non-zero only on real errors (e.g. unknown revision).
+    // A diff with no changes exits 0.
+    const stderr = result.stderr || '';
+    process.stderr.write(`Error running git diff: ${stderr}\n`);
+    process.exit(2);
+  }
+  return result.stdout || '';
 }
 
 /**
@@ -271,19 +274,15 @@ function runGitDiff(branch) {
  * @returns {Array<{ file: string, entity: string|null, entity_type: string, lines: [number, number], diff_summary: string, isNewFile: boolean }>|null}
  */
 function runWeavePreview() {
-  let weaveOutput;
-  try {
-    weaveOutput = execSync('weave-cli preview main', {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf8',
-    });
-  } catch (err) {
+  const weaveResult = spawnSync('weave-cli', ['preview', 'main'], { encoding: 'utf8' });
+  if (weaveResult.error || weaveResult.status !== 0) {
     // weave-cli not in PATH or failed — AC-8: warn and return null
     process.stderr.write(
       'Warning: weave-cli not available or failed, falling back to git diff parsing\n'
     );
     return null;
   }
+  let weaveOutput = weaveResult.stdout || '';
 
   // Parse weave-cli text output.
   // Expected format (weave v0.2.3): lines like
