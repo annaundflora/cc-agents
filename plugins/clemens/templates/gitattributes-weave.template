@@ -1,0 +1,71 @@
+# .gitattributes — Weave Merge Driver + Git Diff Funcname Patterns
+#
+# Usage: Copy this file to .gitattributes in the root of your repository.
+# Then run: weave-cli setup  (registers the merge driver in git config)
+#
+# Weave merge driver performs entity-level semantic merges using Tree-sitter AST.
+# Funcname patterns improve git diff @@ hunk headers to show entity names instead
+# of just line numbers — used by conflict-scanner.js for entity extraction.
+
+# ─── Weave Merge Driver ────────────────────────────────────────────────────────
+
+*.ts    merge=weave
+*.tsx   merge=weave
+*.js    merge=weave
+*.jsx   merge=weave
+*.mjs   merge=weave
+*.cjs   merge=weave
+*.py    merge=weave
+*.go    merge=weave
+*.rs    merge=weave
+*.java  merge=weave
+*.cs    merge=weave
+*.c     merge=weave
+*.cpp   merge=weave
+*.cc    merge=weave
+*.h     merge=weave
+*.hpp   merge=weave
+*.rb    merge=weave
+*.php   merge=weave
+*.swift merge=weave
+
+# ─── Git Diff Funcname Patterns ───────────────────────────────────────────────
+# These patterns determine which line appears in @@ hunk headers during git diff.
+# Format: [attr] diff=<name>  +  [core] [diff "<name>"] xfuncname = <regex>
+# The xfuncname regex is POSIX Extended Regular Expressions (ERE).
+#
+# Correct .gitattributes syntax: only the diff=<name> attribute goes here.
+# The actual xfuncname regex is set in .git/config (or ~/.gitconfig) by weave-cli setup.
+# The entries below register the diff driver names; weave-cli setup registers the patterns.
+
+*.ts   diff=typescript
+*.tsx  diff=typescript
+*.js   diff=javascript
+*.jsx  diff=javascript
+*.mjs  diff=javascript
+*.cjs  diff=javascript
+*.py   diff=python
+*.go   diff=golang
+*.rs   diff=rust
+*.java diff=java
+*.cs   diff=csharp
+*.rb   diff=ruby
+*.php  diff=php
+
+# ─── Manual Funcname Patterns (fallback without weave-cli setup) ───────────────
+# If weave-cli setup has not been run, you can add these to ~/.gitconfig manually:
+#
+# [diff "typescript"]
+#   xfuncname = "^[[:space:]]*(export[[:space:]]+)?(default[[:space:]]+)?(async[[:space:]]+)?(function[[:space:]]+[[:alnum:]_$]+|class[[:space:]]+[[:alnum:]_$]+|const[[:space:]]+[[:alnum:]_$]+[[:space:]]*=[[:space:]]*(async[[:space:]]+)?(\([^)]*\)|[[:alnum:]_$]+)[[:space:]]*=>|[[:alnum:]_$]+[[:space:]]*\([^)]*\)[[:space:]]*\{)"
+#
+# [diff "python"]
+#   xfuncname = "^[[:space:]]*(def[[:space:]]+[[:alnum:]_]+|class[[:space:]]+[[:alnum:]_]+|async[[:space:]]+def[[:space:]]+[[:alnum:]_]+)"
+#
+# [diff "golang"]
+#   xfuncname = "^[[:space:]]*(func[[:space:]]+(\([^)]*\)[[:space:]]+)?[[:alnum:]_]+[[:space:]]*\()"
+#
+# [diff "rust"]
+#   xfuncname = "^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]+[[:alnum:]_]+"
+#
+# [diff "java"]
+#   xfuncname = "^[[:space:]]*(public|protected|private|static|abstract|final|synchronized|native|default)[[:space:]]"
