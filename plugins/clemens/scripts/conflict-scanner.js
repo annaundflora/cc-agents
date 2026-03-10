@@ -299,6 +299,7 @@ function parseDiffHunks(diffOutput) {
 function runGitDiff(base, branch) {
   const result = spawnSync('git', ['diff', `${base}...${branch}`, '--unified=0'], {
     encoding: 'utf8',
+    maxBuffer: 50 * 1024 * 1024,
   });
   if (result.error) {
     process.stderr.write(`Error running git diff: ${result.error.message}\n`);
