@@ -492,9 +492,6 @@ IF final_json.overall_status == "failed":
 ## Phase 4b: Conflict Scan (non-blocking)
 
 ```
-state.current_state = "conflict_scan"
-Write(STATE_FILE, state)
-
 # Step 1: Script aufrufen
 plugin_path = "plugins/clemens"
 scan_result = Bash("node {plugin_path}/scripts/conflict-scanner.js --branch {state.branch} --spec-path {state.spec_path} --repo {repo}")
