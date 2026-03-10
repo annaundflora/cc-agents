@@ -85,6 +85,28 @@ Analysis  Research   Pipeline  + Safeguards
 
 ---
 
+## Updates
+
+Neue Plugin-Versionen werden über einen **manuellen Update-Schritt** eingespielt — Auto-Update ist für Third-Party-Marketplaces standardmäßig deaktiviert.
+
+### Manuell updaten
+
+```bash
+claude plugin update clemens
+```
+
+### Auto-Update aktivieren (optional)
+
+```
+/plugin → Marketplaces → annaundflora → Enable auto-update
+```
+
+Danach erkennt Claude Code beim Start automatisch neue Versionen und updated ohne weiteres Zutun.
+
+> **Hinweis für Publisher:** Jede Code-Änderung erfordert einen Version-Bump in `plugin.json` — ohne Bump erkennen User keine neue Version (Caching).
+
+---
+
 ## Eigenes Plugin hinzufuegen
 
 1. Ordner `plugins/dein-name/` mit `.claude-plugin/plugin.json`, `agents/`, `commands/`, `skills/`
