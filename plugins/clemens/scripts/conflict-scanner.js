@@ -429,21 +429,26 @@ function writeClaims(specPath, entities) {
 // ---------------------------------------------------------------------------
 
 /**
- * Check that the gh CLI is available and authenticated.
- * Exits with code 2 and writes to stderr if not.
+ * Build a clean environment for gh CLI calls that forces keyring auth.
+ * Excludes GITHUB_TOKEN so gh uses the token from `gh auth login`.
+ * Does NOT modify process.env — the caller's environment stays untouched.
  *
- * GITHUB_TOKEN is stripped from the spawn environment so that keyring-based
- * auth is checked. An invalid GITHUB_TOKEN env var (common in mixed CI
- * environments) must not prevent entity-extraction runs from completing.
- * The actual API calls (createIssue, readOtherSessions) use spawnSync
- * without any env override so they pick up whatever token is in scope.
+ * @returns {Object} env copy without GITHUB_TOKEN
  */
-function assertGhAuth() {
+function ghEnv() {
   const env = Object.assign({}, process.env);
   delete env.GITHUB_TOKEN;
-  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8', env });
+  return env;
+}
+
+/**
+ * Check that the gh CLI is available and authenticated via keyring.
+ * Exits with code 2 and writes to stderr if not.
+ */
+function assertGhAuth() {
+  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8', env: ghEnv() });
   if (result.error || result.status !== 0) {
-    process.stderr.write('GitHub CLI not authenticated\n');
+    process.stderr.write('GitHub CLI not authenticated. Run: gh auth login\n');
     process.exit(2);
   }
 }
@@ -514,7 +519,7 @@ function createIssue(repo, feature, body) {
       '--label', 'pipeline:running',
       '--body', body,
     ],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', env: ghEnv() }
   );
 
   if (result.error || result.status !== 0) {
@@ -560,7 +565,7 @@ function readOtherSessions(repo, ownIssueNumber) {
       '--limit', '100',
       '--json', 'number,title,body',
     ],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', env: ghEnv() }
   );
 
   if (result.error || result.status !== 0) {
