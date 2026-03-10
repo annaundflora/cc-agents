@@ -2,7 +2,7 @@
  * Tests for Slice 07: Script-Verzeichnis Plugin-Registration
  *
  * Stack: node-script-no-framework
- * Run:   node plugins/clemens/.claude-plugin/plugin.json.test.js
+ * Run:   node plugins/clemens/scripts/plugin.json.test.js
  *
  * Each test maps 1:1 to an Acceptance Criterion from the slice spec.
  * No mocks -- direct file-system verification with Node.js built-ins.
@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PLUGIN_JSON_PATH = path.resolve(__dirname, 'plugin.json');
+const PLUGIN_JSON_PATH = path.resolve(__dirname, '..', '.claude-plugin', 'plugin.json');
 const PLUGIN_ROOT = path.resolve(__dirname, '..');
 
 let exitCode = 0;
@@ -81,7 +81,7 @@ test(
     const expectedName = 'clemens';
     const expectedDescription =
       "Clemens' Agent-Toolkit: Multi-Agent System mit Fresh Context Pattern, Quality Gates (0-3), und vollständigem Feature-Development-Workflow von Discovery bis Deployment.";
-    const expectedVersion = '1.1.0';
+    const expectedVersion = '1.2.0';
     const expectedAuthor = { name: 'Clemens', email: 'claude-clemens@zipmend.com' };
 
     assert(parsed.hasOwnProperty('name'), 'Missing key: name');
