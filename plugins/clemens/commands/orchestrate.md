@@ -90,6 +90,10 @@ state = {
   "spec_path": spec_path,
   "feature_name": feature_name,
   "status": "in_progress",
+  # Gueltige current_state-Werte: "pre_check" | "implementing" | "code_review" |
+  #   "deterministic_gate" | "writing_tests" | "validating" | "auto_fixing" |
+  #   "slice_complete" | "final_validation" | "conflict_scan" | "conflict_report" |
+  #   "feature_complete"
   "current_state": "pre_check",
   "current_slice_id": null,
   "retry_count": 0,
@@ -450,6 +454,47 @@ WHILE final_json.overall_status == "failed" AND final_retry < MAX_RETRIES:
 
 IF final_json.overall_status == "failed":
   HARD STOP: "Final Validation fehlgeschlagen nach 9 Retries"
+```
+
+---
+
+## Phase 4b: Conflict Scan (non-blocking)
+
+```
+state.current_state = "conflict_scan"
+Write(STATE_FILE, state)
+
+# Step 1: Script aufrufen
+plugin_path = "plugins/clemens"
+scan_result = Bash("node {plugin_path}/scripts/conflict-scanner.js --branch {state.branch} --spec-path {state.spec_path} --repo {repo}")
+scan_exit_code = scan_result.exit_code
+
+# Step 2: Bedingt Sub-Agent aufrufen
+own_issue_number = null
+
+IF scan_exit_code == 1:
+  own_issue_number = parse_issue_number_from_stdout(scan_result.stdout)
+  reporter_result = Task("conflict-reporter", {
+    overlap_report_path: "{state.spec_path}/overlap-report.json",
+    own_issue_number: own_issue_number,
+    repo: repo
+  })
+  reporter_json = parse_agent_json(reporter_result)
+  IF reporter_json.status == "failed":
+    OUTPUT: "Warning: Conflict reporter failed: {reporter_json.notes}"
+  state.current_state = "conflict_report"
+  Write(STATE_FILE, state)
+ELIF scan_exit_code == 0:
+  own_issue_number = parse_issue_number_from_stdout(scan_result.stdout)
+  state.current_state = "conflict_scan"
+  Write(STATE_FILE, state)
+ELIF scan_exit_code == 2:
+  OUTPUT: "Warning: Conflict scan failed: {scan_result.stderr}"
+  # State bleibt unveraendert (non-blocking)
+
+# Step 3: Label wechseln (immer — best-effort)
+IF own_issue_number is not null:
+  Bash("gh issue edit {own_issue_number} --repo {repo} --remove-label pipeline:running --add-label pipeline:merge-ready")
 ```
 
 ---
