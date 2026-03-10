@@ -134,6 +134,17 @@ GUT:
 
 Wenn das Feature neue Infrastruktur braucht (Docker, neue Dependencies, Config-Dateien), wird das ein eigener "Setup"-Slice mit slice-number 01.
 
+### Regel 7: Visuelles Einbinden ≠ Funktionales Verdrahten
+
+Wenn ein UI-Element Daten erzeugt oder entgegennimmt, reicht es NICHT, es nur ins Layout zu mounten. Der Datenfluss bis zur konsumierenden Funktion/Action/API muss ebenfalls in einem Slice spezifiziert sein.
+
+```
+FOR each Discovery-Slice mit "Integration:" in der Testability-Spalte:
+  1. Trace den Datenpfad durch die atomaren Slices
+  2. WENN der letzte Schritt (Wiring an bestehende Funktion/Action/API)
+     in keinem Slice auftaucht → Slice erstellen oder Integration-Slice erweitern
+```
+
 ## Output Format
 
 Schreibe `{spec_path}/slim-slices.md`:
@@ -173,6 +184,18 @@ Schreibe `{spec_path}/slim-slices.md`:
 ...
 ```
 
+## Flow-Traceability (Pflicht-Section im Output)
+
+Nach der Slice-Liste MUSS eine Tabelle stehen, die jeden "Integration:"-Testfall aus der Discovery-Testability-Spalte auf einen atomaren Slice mappt. Wenn ein Testfall keinem Slice zugeordnet werden kann → Decomposition ist unvollständig.
+
+```markdown
+## Flow-Traceability
+
+| Discovery-Slice | Integration-Testfall | Abgedeckt in Slice | Done-Signal |
+|-----------------|----------------------|--------------------|-------------|
+| ... | ... | ... | ... |
+```
+
 ## Qualitäts-Checkliste
 
 Prüfe vor dem Speichern:
@@ -184,6 +207,7 @@ Prüfe vor dem Speichern:
 - [ ] Kein Slice hat mehr als ein Concern (DB+UI = zu viel)
 - [ ] Schema/Service-Slices kommen vor UI-Slices
 - [ ] Stack ist korrekt erkannt und dokumentiert
+- [ ] **Flow-Completeness:** Jeder "Integration:"-Testfall aus Discovery-Testability hat einen zugehörigen Slice mit passendem Done-Signal (Regel 7)
 
 ## Kommunikation
 

@@ -133,7 +133,7 @@ FOR each row in "Data":
 
 #### F) Runtime Path Analysis
 
-Für JEDEN User-Flow aus der Discovery prüfen, ob die **komplette Aufrufkette** durch Slice-Deliverables abgedeckt ist:
+Für JEDEN User-Flow aus der Discovery prüfen, ob die **komplette Aufrufkette** durch **konkrete ACs in Slice-Specs** abgedeckt ist:
 
 ```
 FOR each User-Flow in Discovery "User Flow" / "Transitions":
@@ -141,7 +141,13 @@ FOR each User-Flow in Discovery "User Flow" / "Transitions":
   2. Prüfe für JEDES Glied der Kette:
      - Existiert ein Deliverable in einem Slice?
      - Ist der Trigger-Aufruf spezifiziert (nicht nur die Existenz)?
+     - Existiert ein konkretes AC (GIVEN/WHEN/THEN) im zugeordneten Slice,
+       das diesen Übergang beschreibt? Slice-Zuordnung allein reicht NICHT.
+       WENN kein AC → ❌ GAP
   3. WENN ein Glied fehlt → ❌ GAP: "Runtime path '{flow}' breaks at '{missing_link}'"
+  4. Für jeden "Integration:"-Eintrag in Discovery Testability-Spalte:
+     Finde ein AC in einem Slice das diesen Testfall erfüllt.
+     WENN nicht → ❌ GAP
 ```
 
 **Typische Lücken:**
@@ -151,6 +157,7 @@ FOR each User-Flow in Discovery "User Flow" / "Transitions":
 | Fehlender Trigger | Service existiert, wird aber nie aufgerufen | Alle Entry Points des Service gegen User-Flows abgleichen |
 | Fehlende Proxy-Route | Backend-Endpoint existiert, Frontend-Proxy-Route fehlt | Frontend-Requests prüfen: gehen sie über den Frontend-Server? |
 | Fehlende Pipeline-Verkettung | Service A ruft Service B nicht auf | DI-Chain und fire-and-forget Tasks prüfen |
+| UI ohne Wiring | UI-Element erzeugt Daten, aber kein AC beschreibt deren Konsum durch Action/API | Für jedes datenerzeugende UI-Element: AC für Datenkonsum vorhanden? |
 
 #### G) Infrastructure Prerequisite Check
 
