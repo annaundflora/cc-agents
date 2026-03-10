@@ -5,6 +5,5 @@
   "author": {
     "name": "Clemens",
     "email": "claude-clemens@zipmend.com"
-  },
-  "scripts": ["scripts/conflict-scanner.js"]
+  }
 }
