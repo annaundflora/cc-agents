@@ -30,7 +30,7 @@ Wenn `--spec-path` nicht automatisch ermittelt werden kann, frage den User.
 ## Scan ausführen
 
 ```
-plugin_path = "plugins/clemens"
+plugin_path = "${CLAUDE_PLUGIN_ROOT}"
 scan_result = Bash("node {plugin_path}/scripts/conflict-scanner.js --branch {branch} --spec-path {spec_path} --repo {repo} [--weave]")
 ```
 

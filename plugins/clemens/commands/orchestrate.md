@@ -462,7 +462,7 @@ IF final_json.overall_status == "failed":
 
 ```
 # Step 1: Script aufrufen
-plugin_path = "plugins/clemens"
+plugin_path = "${CLAUDE_PLUGIN_ROOT}"
 scan_result = Bash("node {plugin_path}/scripts/conflict-scanner.js --branch {state.branch} --spec-path {state.spec_path} --repo {repo}")
 scan_exit_code = scan_result.exit_code
 
