@@ -244,7 +244,7 @@ FOR each wave IN waves:
 
       review_json = parse_agent_json(review_result)
 
-      IF review_json.verdict == "APPROVED" OR review_json.verdict == "CONDITIONAL":
+      IF review_json.verdict == "APPROVED":
         OUTPUT: "Code Review: {review_json.verdict} (Iteration {review_retries + 1})"
         BREAK
 

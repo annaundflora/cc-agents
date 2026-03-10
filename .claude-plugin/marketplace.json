@@ -14,7 +14,7 @@
       "name": "clemens",
       "source": "./plugins/clemens",
       "description": "Clemens komplettes Agent-Toolkit: Discovery, Architecture, Planning, Implementation, Testing, Strategy. 16 Agents, 8 Commands, 9 Templates mit Quality Gates (Gate 0-3).",
-      "version": "1.2.3",
+      "version": "1.2.4",
       "author": {
         "name": "Clemens",
         "email": "claude-clemens@zipmend.com"
