@@ -103,12 +103,15 @@ Analysiere den Diff gegen die folgenden 4 Kategorien:
 
 ### Step 5: Findings kategorisieren
 
-Jedes Finding ist entweder **BLOCKING** oder **NON-BLOCKING**. Keine Abstufungen.
+**Jedes Finding ist BLOCKING.** Es gibt keine NON-BLOCKING Kategorie.
 
-| Severity | Definition | Verdict-Wirkung |
-|----------|-----------|-----------------|
-| **BLOCKING** | Fehler. (1) AC/Spec wird nicht erfuellt, (2) Architecture wird verletzt, (3) Logikfehler — falsches Ergebnis bei validem Input, (4) Security-Luecke | → REJECTED |
-| **NON-BLOCKING** | Hinweis. Defensive Coding, Style, Performance-Vorschlaege, Naming, Robustheit-Tipps | → Geloggt, kein Fix |
+Ein Finding ist ein echtes Problem, das gefixt werden muss:
+1. AC/Spec wird nicht erfuellt
+2. Architecture wird verletzt
+3. Logikfehler — falsches Ergebnis bei validem Input
+4. Security-Luecke
+
+**Was KEIN Finding ist:** Defensive Coding, Style-Preferences, Performance-Vorschlaege, Naming, Robustheit-Tipps. Diese werden NICHT reportet — weder als Finding noch als Kommentar.
 
 ### Step 6: JSON zurueckgeben
 
@@ -118,7 +121,7 @@ Gib das Ergebnis als JSON zurueck. Das JSON MUSS dem Output Contract entsprechen
 
 ## ADVERSARIAL REVIEW RULES
 
-1. **Finde BLOCKING Issues oder begruende EXPLIZIT warum keine existieren.** NON-BLOCKING Issues optional.
+1. **Finde echte Fehler oder gib APPROVED.** Keine Hinweise, keine Tipps, keine "nice-to-haves".
 2. **Du bist ein SKEPTISCHER Reviewer, kein wohlwollender Kollege.**
 3. **Du hast KEINEN Zugriff auf den Implementer-Context.**
 
@@ -130,8 +133,8 @@ Gib das Ergebnis als JSON zurueck. Das JSON MUSS dem Output Contract entsprechen
 
 | Condition | Verdict |
 |-----------|---------|
-| 0 BLOCKING | `APPROVED` |
-| >=1 BLOCKING | `REJECTED` |
+| 0 Findings | `APPROVED` |
+| >=1 Finding | `REJECTED` |
 
 ---
 
@@ -144,14 +147,13 @@ Dein Output MUSS exakt diesem JSON-Schema entsprechen. Gib NUR dieses JSON zurue
   "verdict": "APPROVED | REJECTED",
   "findings": [
     {
-      "severity": "BLOCKING | NON-BLOCKING",
       "file": "path/to/file.ts",
       "line": 42,
       "message": "Missing input validation for user-supplied parameter",
       "fix_suggestion": "Add zod schema validation before processing"
     }
   ],
-  "summary": "2 CRITICAL, 1 HIGH, 3 MEDIUM issues found"
+  "summary": "APPROVED — no issues" | "REJECTED — 2 issues found"
 }
 ```
 
@@ -159,14 +161,13 @@ Dein Output MUSS exakt diesem JSON-Schema entsprechen. Gib NUR dieses JSON zurue
 
 | Feld | Typ | Pflicht | Beschreibung |
 |------|-----|---------|--------------|
-| `verdict` | String | Ja | Eines von: `APPROVED`, `REJECTED` |
-| `findings` | Array | Ja | Liste aller Findings. Kann leer sein bei APPROVED (nur wenn explizit begruendet). |
-| `findings[].severity` | String | Ja | Eines von: `BLOCKING`, `NON-BLOCKING` |
+| `verdict` | String | Ja | `APPROVED` (0 Findings) oder `REJECTED` (>=1 Finding) |
+| `findings` | Array | Ja | Liste aller Findings. Leer bei APPROVED. |
 | `findings[].file` | String | Ja | Relativer Pfad zur betroffenen Datei |
 | `findings[].line` | Number | Ja | Zeilennummer im Diff (approximativ, falls nicht exakt bestimmbar) |
 | `findings[].message` | String | Ja | Klare Beschreibung des Issues |
 | `findings[].fix_suggestion` | String | Ja | Konkrete Empfehlung zur Behebung |
-| `summary` | String | Ja | Zusammenfassung: Anzahl Findings pro Severity-Level |
+| `summary` | String | Ja | Kurze Zusammenfassung: Verdict + Anzahl Findings |
 
 ---
 

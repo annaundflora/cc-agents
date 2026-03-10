@@ -278,8 +278,7 @@ FOR each wave IN waves:
         BREAK
 
       IF review_json.verdict == "REJECTED":
-        blocking = [f for f in review_json.findings if f.severity == "BLOCKING"]
-        log_gate(slice_id, "code_review", {"verdict": "REJECTED", "blocking": len(blocking), "findings": [f.message for f in blocking], "attempt": review_retries + 1})
+        log_gate(slice_id, "code_review", {"verdict": "REJECTED", "findings_count": len(review_json.findings), "findings": [f.message for f in review_json.findings], "attempt": review_retries + 1})
         review_retries++
         OUTPUT: "Code Review REJECTED (Versuch {review_retries}/{MAX_REVIEW_RETRIES}) → Auto-Fix..."
 
@@ -293,7 +292,7 @@ FOR each wave IN waves:
             Review-Findings: {review_json.findings}
             Slice-Spec: {spec_file}
             Architecture: {architecture_file}
-            Fixe NUR die BLOCKING Findings.
+            Fixe ALLE Findings.
             Committe mit: git add -A && git commit -m 'fix({slice_id}): address code review findings'
           "
         )
