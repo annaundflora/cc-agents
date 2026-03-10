@@ -23,6 +23,7 @@ Bestimme die drei Pflicht-Parameter für das Script. Nutze `$ARGUMENTS` wenn vor
 | `--branch` | Erstes Argument oder `--branch X` | `git branch --show-current` |
 | `--spec-path` | `--spec-path X` | Suche nach `specs/*/architecture.md` oder `specs/*/.orchestrator-state.json` passend zum Branch-Namen |
 | `--repo` | `--repo X` | `gh repo view --json nameWithOwner -q .nameWithOwner` |
+| `--base` | `--base X` | Auto-Detection: origin HEAD, dann `main`, dann `master` (optional) |
 | `--weave` | `--weave` Flag | Nicht gesetzt (optional) |
 
 Wenn `--spec-path` nicht automatisch ermittelt werden kann, frage den User.

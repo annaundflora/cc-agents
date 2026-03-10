@@ -8,7 +8,7 @@
  *          Session Registry | Overlap Calculator | Report Writer | Exit Handler
  *
  * Usage:
- *   node conflict-scanner.js --branch <branch> --spec-path <path> --repo <owner/repo> [--weave]
+ *   node conflict-scanner.js --branch <branch> --spec-path <path> --repo <owner/repo> [--base <branch>] [--weave]
  *
  * Exit codes:
  *   0  — No overlaps found
@@ -28,10 +28,48 @@ const crypto = require('crypto');
 // ---------------------------------------------------------------------------
 
 /**
+ * Auto-detect the default branch of the repository.
+ * Tries (in order):
+ *   1. origin HEAD ref (works in worktrees too)
+ *   2. Local branch existence: main, then master
+ * Exits with code 2 if no default branch can be determined.
+ *
+ * @returns {string}
+ */
+function detectBaseBranch() {
+  // Try origin HEAD symbolic ref (most reliable, works across worktrees)
+  try {
+    const ref = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    // ref is e.g. "refs/remotes/origin/main"
+    const branch = ref.replace(/^refs\/remotes\/origin\//, '');
+    if (branch) return branch;
+  } catch (_) {
+    // origin HEAD not set — fall through
+  }
+
+  // Try common default branch names
+  for (const candidate of ['main', 'master']) {
+    const result = spawnSync('git', ['rev-parse', '--verify', candidate], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    if (result.status === 0) return candidate;
+  }
+
+  process.stderr.write(
+    'Error: Could not detect base branch. Use --base <branch> to specify it explicitly.\n'
+  );
+  process.exit(2);
+}
+
+/**
  * Parse process.argv into a structured args object.
  * Validates all required arguments and exits with code 2 on failure.
  *
- * @returns {{ branch: string, specPath: string, repo: string, useWeave: boolean }}
+ * @returns {{ branch: string, base: string, specPath: string, repo: string, useWeave: boolean }}
  */
 function parseArgs() {
   const argv = process.argv.slice(2);
@@ -47,6 +85,9 @@ function parseArgs() {
       i++;
     } else if (token === '--repo') {
       args.repo = argv[i + 1];
+      i++;
+    } else if (token === '--base') {
+      args.base = argv[i + 1];
       i++;
     } else if (token === '--weave') {
       args.useWeave = true;
@@ -97,8 +138,12 @@ function parseArgs() {
     process.exit(2);
   }
 
+  // Resolve base branch: explicit --base, or auto-detect
+  const base = args.base || detectBaseBranch();
+
   return {
     branch: args.branch,
+    base,
     specPath: resolvedSpecPath,       // absolute path — used for all fs operations
     specPathRelative,                  // original path as supplied — used in GitHub Issue body
     repo: args.repo,
@@ -241,17 +286,18 @@ function parseDiffHunks(diffOutput) {
 }
 
 /**
- * Run `git diff main...{branch} --unified=0` and return the output.
+ * Run `git diff {base}...{branch} --unified=0` and return the output.
  * Uses spawnSync with an argument array so the branch name is never
  * interpreted by the shell — prevents shell injection regardless of
  * characters in the branch name.
  * Exits with code 2 on failure.
  *
+ * @param {string} base
  * @param {string} branch
  * @returns {string}
  */
-function runGitDiff(branch) {
-  const result = spawnSync('git', ['diff', `main...${branch}`, '--unified=0'], {
+function runGitDiff(base, branch) {
+  const result = spawnSync('git', ['diff', `${base}...${branch}`, '--unified=0'], {
     encoding: 'utf8',
   });
   if (result.error) {
@@ -276,10 +322,11 @@ function runGitDiff(branch) {
  * weave-cli has no --json flag (documented limitation). We parse text output
  * looking for file/entity references in the preview output.
  *
+ * @param {string} base
  * @returns {{ rawOutput: string, entities: Array<{ file: string, entity: string|null, entity_type: string, lines: [number, number], diff_summary: string, isNewFile: boolean }>|null }}
  */
-function runWeavePreview() {
-  const weaveResult = spawnSync('weave-cli', ['preview', 'main'], { encoding: 'utf8' });
+function runWeavePreview(base) {
+  const weaveResult = spawnSync('weave-cli', ['preview', base], { encoding: 'utf8' });
   if (weaveResult.error || weaveResult.status !== 0) {
     // weave-cli not in PATH or failed — AC-8: warn and return null
     process.stderr.write(
@@ -341,20 +388,21 @@ function runWeavePreview() {
  * Extract entities from the branch, optionally using weave-cli.
  * Applies the Top-50 cap per architecture.md Risks section.
  *
+ * @param {string} base
  * @param {string} branch
  * @param {boolean} useWeave
  * @returns {Array<{ file: string, entity: string|null, entity_type: string, lines: [number, number], diff_summary: string, isNewFile: boolean }>}
  */
-function extractEntities(branch, useWeave) {
+function extractEntities(base, branch, useWeave) {
   let hunks = null;
 
   if (useWeave) {
-    const { entities } = runWeavePreview();
+    const { entities } = runWeavePreview(base);
     hunks = entities; // null means fallback to git diff (AC-8)
   }
 
   if (hunks === null) {
-    const diffOutput = runGitDiff(branch);
+    const diffOutput = runGitDiff(base, branch);
     hunks = parseDiffHunks(diffOutput);
   }
 
@@ -877,7 +925,7 @@ function exitWithResult(reportPath, ownIssueNumber, overlaps, summary) {
 
 function main() {
   // Step 1: Parse and validate CLI args
-  const { branch, specPath, specPathRelative, repo, useWeave } = parseArgs();
+  const { branch, base, specPath, specPathRelative, repo, useWeave } = parseArgs();
 
   const sessionId = crypto.randomUUID();
   const startedAt = new Date().toISOString();
@@ -890,13 +938,13 @@ function main() {
   let entities = null;
 
   if (useWeave) {
-    const { rawOutput, entities: weaveEntities } = runWeavePreview();
+    const { rawOutput, entities: weaveEntities } = runWeavePreview(base);
     weaveOutput = rawOutput;   // may be null if weave-cli was unavailable
     entities = weaveEntities;  // null triggers git diff fallback below
   }
 
   if (entities === null) {
-    const diffOutput = runGitDiff(branch);
+    const diffOutput = runGitDiff(base, branch);
     entities = parseDiffHunks(diffOutput);
   }
 
