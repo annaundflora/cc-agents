@@ -90,10 +90,10 @@ state = {
   "spec_path": spec_path,
   "feature_name": feature_name,
   "status": "in_progress",
-  # Gueltige current_state-Werte: "pre_check" | "implementing" | "code_review" |
-  #   "deterministic_gate" | "writing_tests" | "validating" | "auto_fixing" |
-  #   "slice_complete" | "final_validation" | "conflict_scan" | "conflict_report" |
-  #   "feature_complete"
+  # Gueltige current_state-Werte: "worktree_setup" | "pre_scan" | "pre_check" |
+  #   "implementing" | "code_review" | "deterministic_gate" | "writing_tests" |
+  #   "validating" | "auto_fixing" | "slice_complete" | "final_validation" |
+  #   "conflict_scan" | "conflict_report" | "feature_complete"
   "current_state": "pre_check",
   "current_slice_id": null,
   "retry_count": 0,
@@ -107,12 +107,6 @@ state = {
 IF EXISTS STATE_FILE:
   # Resume-Logik
 
-# Worktree-Erstellung (idempotent)
-worktree_check = Bash("git worktree list")
-IF NOT "worktrees/{feature_name}" IN worktree_check.output:
-  Bash("git worktree add worktrees/{feature_name} -b feature/{feature_name}")
-state.worktree_path = "worktrees/{feature_name}"
-state.branch = "feature/{feature_name}"
 Write(STATE_FILE, state)
 ```
 
@@ -132,6 +126,53 @@ FUNCTION parse_agent_json(agent_output):
     RETURN parsed
   CATCH:
     HARD STOP: "JSON Parse Failure"
+```
+
+---
+
+## Phase 0: Worktree Setup + Pre-Scan
+
+```
+# Step 0a: Worktree erstellen oder rebasen
+state.current_state = "worktree_setup"
+Write(STATE_FILE, state)
+
+worktree_check = Bash("git worktree list")
+IF "worktrees/{feature_name}" IN worktree_check.output:
+  rebase_result = Bash("cd worktrees/{feature_name} && git rebase main")
+  IF rebase_result.exit_code != 0:
+    Bash("cd worktrees/{feature_name} && git rebase --abort")
+    OUTPUT: "Warning: Rebase failed, continuing on current base."
+ELSE:
+  worktree_result = Bash("git worktree add worktrees/{feature_name} -b feature/{feature_name}")
+  IF worktree_result.exit_code != 0:
+    OUTPUT: "Warning: Worktree creation failed, continuing on current branch."
+
+state.worktree_path = "worktrees/{feature_name}"
+state.branch = "feature/{feature_name}"
+Write(STATE_FILE, state)
+
+# Step 0b: Pre-Scan (Predicted Claims)
+state.current_state = "pre_scan"
+Write(STATE_FILE, state)
+
+repo = Bash("gh repo view --json nameWithOwner -q .nameWithOwner").stdout.trim()
+scanner_result = Task("conflict-scanner", {
+  mode: "predict",
+  spec_path: state.spec_path,
+  repo: repo
+})
+scanner_json = parse_agent_json(scanner_result)
+
+IF scanner_json.status == "completed":
+  state.issue_number = scanner_json.issue_number
+  IF scanner_json.has_overlap:
+    OUTPUT: "⚠️ Pre-Scan: Overlap mit anderen Sessions gefunden. Advisory — Pipeline laeuft weiter."
+    OUTPUT: scanner_json.notes
+ELIF scanner_json.status == "failed":
+  OUTPUT: "Warning: Pre-scan failed: {scanner_json.notes}. Pipeline laeuft weiter."
+
+Write(STATE_FILE, state)
 ```
 
 ---
@@ -478,37 +519,40 @@ Bash("git diff --quiet || git add -A && git commit -m 'style: lint auto-fix'")
 ## Phase 4b: Conflict Scan (non-blocking)
 
 ```
-# Step 1: Script aufrufen
-plugin_path = "${CLAUDE_PLUGIN_ROOT}"
-scan_result = Bash("node {plugin_path}/scripts/conflict-scanner.js --branch {state.branch} --spec-path {state.spec_path} --repo {repo}")
-scan_exit_code = scan_result.exit_code
+# Step 1: Scanner-Agent aufrufen (Post-Scan)
+state.current_state = "conflict_scan"
+Write(STATE_FILE, state)
 
-# Step 2: Bedingt Sub-Agent aufrufen
-own_issue_number = null
+scanner_result = Task("conflict-scanner", {
+  mode: "actual",
+  branch: state.branch,
+  spec_path: state.spec_path,
+  repo: repo,
+  issue_number: state.issue_number
+})
+scanner_json = parse_agent_json(scanner_result)
 
-IF scan_exit_code == 1:
-  own_issue_number = parse_issue_number_from_stdout(scan_result.stdout)
+# Step 2: Bedingt Reporter-Agent aufrufen
+IF scanner_json.status == "completed" AND scanner_json.has_overlap == true:
+  state.current_state = "conflict_report"
+  Write(STATE_FILE, state)
   reporter_result = Task("conflict-reporter", {
     overlap_report_path: "{state.spec_path}/overlap-report.json",
-    own_issue_number: own_issue_number,
+    own_issue_number: state.issue_number,
     repo: repo
   })
   reporter_json = parse_agent_json(reporter_result)
   IF reporter_json.status == "failed":
     OUTPUT: "Warning: Conflict reporter failed: {reporter_json.notes}"
-  state.current_state = "conflict_report"
-  Write(STATE_FILE, state)
-ELIF scan_exit_code == 0:
-  own_issue_number = parse_issue_number_from_stdout(scan_result.stdout)
-  state.current_state = "conflict_scan"
-  Write(STATE_FILE, state)
-ELIF scan_exit_code == 2:
-  OUTPUT: "Warning: Conflict scan failed: {scan_result.stderr}"
-  # State bleibt unveraendert (non-blocking)
+ELIF scanner_json.status == "completed" AND scanner_json.has_overlap == false:
+  OUTPUT: "Post-Scan: Keine Overlaps gefunden."
+ELIF scanner_json.status == "failed":
+  OUTPUT: "Warning: Conflict scan failed: {scanner_json.notes}"
+  # Non-blocking — Pipeline geht weiter
 
 # Step 3: Label wechseln (immer — best-effort)
-IF own_issue_number is not null:
-  Bash("gh issue edit {own_issue_number} --repo {repo} --remove-label pipeline:running --add-label pipeline:merge-ready")
+IF state.issue_number is not null:
+  Bash("gh issue edit {state.issue_number} --repo {repo} --remove-label pipeline:running --add-label pipeline:merge-ready")
 ```
 
 ---

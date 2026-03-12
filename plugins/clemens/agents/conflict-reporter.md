@@ -60,10 +60,6 @@ Extrahiere folgende Felder aus dem JSON:
 | `summary.overlapping_entities` | Integer | Anzahl Entities mit Overlap |
 | `feature` | String | Feature-Name dieser Session |
 | `branch` | String | Branch-Name dieser Session |
-| `weave_validation` | Object / null | Weave-Analyse-Ergebnis (null wenn --weave nicht genutzt) |
-| `weave_validation.auto_resolvable` | Boolean | Ob Weave alle Overlaps automatisch loesen kann |
-| `weave_validation.conflict_entities` | String[] | Entity-Namen die Weave NICHT loesen kann |
-| `weave_validation.confidence` | String | Konfidenz: `"high"`, `"medium"`, `"low"` |
 
 Fallback: Lies KEINE externen Quellen. Wenn `overlap_report_path` nicht lesbar ist, gib sofort das Fehler-Output-JSON zurueck.
 
@@ -92,7 +88,7 @@ _(Eine Zeile pro Overlap-Eintrag aus `overlaps[]`.)_
 **Kontext:** {N} Datei(en) mit {M} Entity/Entities betroffen. Schweregrad: **{max_severity}**.
 {Kurze menschenlesbare Beschreibung der Situation: welche Sessions kollidieren, welche Entities sind betroffen, seit wann laufen die Sessions parallel.}
 
-**Empfehlung:** {Empfehlung basierend auf weave_validation und severity — siehe Empfehlungs-Logik unten}
+**Empfehlung:** {Empfehlung basierend auf severity — siehe Empfehlungs-Logik unten}
 ```
 
 #### Spalten-Definitionen der Tabelle
@@ -107,19 +103,16 @@ _(Eine Zeile pro Overlap-Eintrag aus `overlaps[]`.)_
 
 #### Empfehlungs-Logik
 
-Bestimme die Empfehlung basierend auf `weave_validation` und `severity`:
+Bestimme die Empfehlung basierend auf `severity`:
 
 | Bedingung | Empfehlung |
 |-----------|------------|
-| `weave_validation.auto_resolvable == true` (alle Overlaps `severity: "low"`) | "Weave loest automatisch: Alle Ueberschneidungen liegen in verschiedenen Entities derselben Datei. Weave kann diese beim Merge automatisch aufloesen (Konfidenz: {confidence}). Kein manueller Eingriff noetig." |
-| `weave_validation.auto_resolvable == false` | "Manueller Review empfohlen: Weave kann folgende Entities NICHT automatisch mergen: {conflict_entities}. Bitte koordiniert die Merge-Reihenfolge manuell." |
-| `weave_validation == null` und `summary.max_severity == "high"` | "Manueller Review empfohlen: Mindestens eine Ueberschneidung betrifft dieselbe Entity (`same_entity`). Weave-Analyse nicht verfuegbar. Bitte koordiniert die Merge-Reihenfolge manuell." |
-| `weave_validation == null` und `summary.max_severity == "low"` | "Ueberschneidung in derselben Datei, aber verschiedenen Entities (`same_file_different_entity`). Weave-Analyse nicht verfuegbar — manueller Check beim Merge empfohlen." |
+| `summary.max_severity == "high"` | "Manueller Review empfohlen: Gleiche Entity in mehreren Sessions geaendert. Merge-Reihenfolge koordinieren — erst andere Session mergen, dann rebasen." |
+| `summary.max_severity == "low"` | "Wahrscheinlich konfliktfrei: Verschiedene Entities in gleicher Datei. git merge loest dies in der Regel automatisch." |
 
 **Wichtig:**
-- Bei `auto_resolvable == false` oder `weave_validation == null` mit `severity: "high"`: Enthaelt die Empfehlung IMMER explizit "Manueller Review empfohlen" und den Hinweis, dass Weave diese Entity nicht automatisch mergen kann.
-- Bei `auto_resolvable == true`: Enthaelt die Empfehlung "Weave loest automatisch" und KEINE Eskalations-Aufforderung.
-- Bei `weave_validation == null`: KEINE Weave-spezifischen Aussagen ueber auto_resolvable.
+- Bei `max_severity == "high"`: Empfehlung enthaelt IMMER "Manueller Review empfohlen".
+- Bei `max_severity == "low"`: Empfehlung enthaelt "Wahrscheinlich konfliktfrei".
 
 ---
 
