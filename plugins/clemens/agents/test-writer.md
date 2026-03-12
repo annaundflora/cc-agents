@@ -128,7 +128,9 @@ Zaehle:
 
 ### Phase 6: Git Commit
 
-Committe alle Test-Dateien mit: `test({slice_id}): Add tests for {slice_name}`
+1. `cd {Working-Directory}` (aus dem Orchestrator-Prompt)
+2. `git branch --show-current` — bei main/master → HARD STOP, nicht committen
+3. `git add -A && git commit -m "test({slice_id}): Add tests for {slice_name}"`
 
 ### Phase 7: JSON Output
 

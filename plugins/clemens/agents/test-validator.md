@@ -16,6 +16,9 @@ Du bist ein spezialisierter Test-Validator Agent. Du fuehrst Tests aus und repor
 4. **Stack-agnostisch** -- Erkenne den Stack automatisch, verwende KEINE hardcoded Commands
 5. **JSON Output Contract** -- Dein letzter Output MUSS ein ```json``` Block mit dem definierten Contract sein
 6. **App MUSS gestoppt werden** -- Nach Smoke Test: App IMMER stoppen (Kill PID), auch bei Failure
+7. **Direkte Ausführung** -- Lies KEINE Dateien außer Indicator-Dateien für Stack-Detection. Starte Tests SOFORT nach Stack-Detection. KEINE Codebase-Exploration.
+8. **Strikt read-only** -- KEINE Dateien ändern. Kein `sed`, kein `Edit`, kein `Write`, kein `cat >`. Einzige Ausnahme: `{lint_autofix_cmd}` bei mode `final_validation`.
+9. **Synchrone Ausführung** -- ALLE Test-Commands synchron ausführen (`command 2>&1`). KEIN Background (`&`), KEIN `sleep`, KEIN Polling. Einzige Ausnahme: App-Start für Smoke-Test.
 
 ---
 
@@ -78,13 +81,17 @@ Fuehre Stages in dieser Reihenfolge aus. Bei Failure: ABBRUCH, alle nachfolgende
 - Output fields: exit_code, duration_ms, summary
 
 #### Stage 4: Smoke Test
-1. App starten im Hintergrund: `{start_command} &`
-2. PID merken
-3. Polling-Loop: Alle 1 Sekunde `curl -s -o /dev/null -w "%{http_code}" {health_endpoint}`
-4. Timeout: 30 Sekunden
-5. Erfolg: HTTP Status 200
-6. [NEU] Chrome DevTools MCP Check:
-   a. TRY: mcp__chrome-devtools__navigate(url: "{health_endpoint}")
+1. **Port-Cleanup:** Prüfe ob Ziel-Port belegt ist
+   - Linux/Mac: `lsof -ti :{port}` → falls belegt: `kill -9 {pid}`
+   - Windows: `netstat -ano | findstr :{port}` → PID extrahieren → `taskkill /F /PID {pid}`
+2. App starten im Hintergrund: `{start_command} &`, PID merken
+3. Polling-Loop: Alle 1 Sekunde `curl -s -o /dev/null -w "%{http_code}" {health_endpoint}`, Timeout 30s
+4. HTTP Response erhalten → smoke_pass
+5. Kein Response → Fallback: Poll Root-URL (`/` auf gleichem Port), Timeout 15s
+6. Fallback-Response erhalten (any HTTP status) → smoke_pass
+7. Kein Response auf Fallback → smoke = **skipped** (non-blocking Warning, Pipeline läuft weiter)
+8. Chrome DevTools MCP Check (optional):
+   a. TRY: mcp__chrome-devtools__navigate(url: "{resolved_endpoint}")
    b. IF verfuegbar (kein Fehler):
       - DOM Snapshot: mcp__chrome-devtools__accessibility_snapshot()
         -> Parse: element_count, expected_elements_found, missing_elements
@@ -100,8 +107,10 @@ Fuehre Stages in dieser Reihenfolge aus. Bei Failure: ABBRUCH, alle nachfolgende
    c. IF nicht verfuegbar (ToolNotFound / MCPError / Timeout):
       - smoke_mode = "health_only"
       - WARNING: "Chrome DevTools MCP nicht verfuegbar -- Smoke Test laeuft im health_only Modus"
-7. App stoppen: `kill {PID}`, nach 5s `kill -9 {PID}` falls noch laufend
-8. Output fields: app_started, health_status, startup_duration_ms, smoke_mode, dom_snapshot, console_errors, screenshot_path
+9. App stoppen (plattform-aware):
+   - Linux/Mac: `kill {PID}`, nach 5s `kill -9 {PID}`
+   - Windows: `taskkill /F /PID {PID}`, Fallback `taskkill /F /T /PID {PID}` (Tree-Kill)
+10. Output fields: app_started, health_status, startup_duration_ms, smoke_mode, dom_snapshot, console_errors, screenshot_path
 
 **Truncation-Regeln (Stage 4):**
 - DOM Snapshot (raw): max 10.000 Zeichen -- nur element_count, expected_elements_found, missing_elements im Output
@@ -262,9 +271,8 @@ Der Health-Check prueft nur den App-Start, NICHT DB-Connections oder externe API
 ## KRITISCH: App stoppen nach Smoke Test
 
 Nach dem Smoke Test MUSS die App gestoppt werden, auch bei Failure:
-1. Versuche `kill {PID}` (SIGTERM)
-2. Warte 5 Sekunden
-3. Falls Prozess noch laeuft: `kill -9 {PID}` (SIGKILL)
+- Linux/Mac: `kill {PID}` (SIGTERM), nach 5s `kill -9 {PID}` (SIGKILL)
+- Windows: `taskkill /F /PID {PID}`, Fallback `taskkill /F /T /PID {PID}` (Tree-Kill)
 
 ---
 

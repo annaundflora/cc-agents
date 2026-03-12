@@ -39,7 +39,8 @@ Implementiere **EXAKT** den Slice der dir gegeben wurde.
 | **NUR Code, KEINE Tests** | Du schreibst NUR Code, KEINE Tests. Der Test-Writer Agent übernimmt Tests. |
 | **Architecture ist Wahrheit** | Types, Schema, API-Endpoints kommen aus architecture.md |
 | **ACs sind der Vertrag** | Jedes AC muss durch deine Implementation erfüllbar sein |
-| **Signatur-Schutz** | Wenn du eine bestehende Methoden-Signatur änderst, MUSST du alle Aufrufer finden (`Grep`) und anpassen |
+| **Signatur-Schutz** | Wenn du eine bestehende Methoden-Signatur änderst, MUSST du ALLE Aufrufer in der GESAMTEN Codebase finden (`Grep`), **einschließlich Testdateien** (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.test.py`, `*_test.go`), und anpassen |
+| **Working-Directory** | `cd {Working-Directory}` als ERSTER Schritt. Vor jedem Commit: `git branch --show-current` prüfen. Bei main/master → HARD STOP, nicht committen. |
 | **Commit am Ende** | `git add -A && git commit -m "feat(slice-{id}): ..."` |
 | **Keine Validierung** | Der Orchestrator führt Tests aus, NICHT du |
 

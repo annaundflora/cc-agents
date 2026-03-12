@@ -211,6 +211,7 @@ FOR each wave IN waves:
         Slice-Spec: {spec_file}
         Architecture: {architecture_file}
         Integration-Map: {integration_map_file}
+        Working-Directory: {state.worktree_path}
 
         REGELN:
         1. Lies die Slice-Spec vollstaendig
@@ -262,6 +263,7 @@ FOR each wave IN waves:
             Fixe Code-Review-Findings fuer {slice_id}.
             Review-Findings: {review_json.findings}
             Slice-Spec: {spec_file}
+            Working-Directory: {state.worktree_path}
             Fixe NUR die CRITICAL und HIGH Findings.
             Committe mit: git add -A && git commit -m 'fix({slice_id}): address code review findings'
           "
@@ -329,6 +331,7 @@ FOR each wave IN waves:
         Schreibe Tests fuer {slice_id}.
         Slice-Spec (ACs): {spec_file}
         Geaenderte Dateien: {impl_json.files_changed}
+        Working-Directory: {state.worktree_path}
         Schreibe Tests gegen die Spec-ACs, nicht gegen den Code.
       "
     )
@@ -430,30 +433,44 @@ FOR each wave IN waves:
 state.current_state = "final_validation"
 Write(STATE_FILE, state)
 
-final_result = Task(
-  subagent_type: "test-validator",
-  prompt: "
-    Final Validation fuer Feature {feature_name}.
-    Mode: final_validation
-    Previous-Slice-Tests: {get_all_test_paths(completed_slices)}
-    Working-Directory: {working_dir}
-  "
-)
+# Lean Mode: Direkte Bash-Calls, KEIN Sub-Agent, KEIN Stack-Re-Detection.
+# Nutzt detected_stack aus Phase 2b.
 
-final_json = parse_agent_json(final_result)
+# 1. Lint Auto-Fix
+IF detected_stack.lint_autofix_cmd != null:
+  Bash(detected_stack.lint_autofix_cmd)
 
-# Retry bei Failure (max 9x)
-final_retry = 0
-WHILE final_json.overall_status == "failed" AND final_retry < MAX_RETRIES:
-  final_retry += 1
-  fix_result = Task(subagent_type: "debugger", ...)
-  fix_json = parse_agent_json(fix_result)
-  IF fix_json.status == "unable_to_fix": HARD STOP
-  final_result = Task(subagent_type: "test-validator", mode: final_validation, ...)
-  final_json = parse_agent_json(final_result)
+# 2. Lint Check
+lint_retry = 0
+IF detected_stack.lint_check_cmd != null:
+  lint = Bash(detected_stack.lint_check_cmd)
+  WHILE lint.exit_code != 0 AND lint_retry < 3:
+    lint_retry += 1
+    fix_result = Task(subagent_type: "debugger", prompt: "Lint fehlgeschlagen. Output: {lint.output}. Fixe die Fehler.")
+    lint = Bash(detected_stack.lint_check_cmd)
+  IF lint.exit_code != 0: HARD STOP: "Lint nach 3 Retries fehlgeschlagen"
 
-IF final_json.overall_status == "failed":
-  HARD STOP: "Final Validation fehlgeschlagen nach 9 Retries"
+# 3. TypeCheck
+tc_retry = 0
+IF detected_stack.typecheck_cmd != null:
+  tc = Bash(detected_stack.typecheck_cmd)
+  WHILE tc.exit_code != 0 AND tc_retry < 3:
+    tc_retry += 1
+    fix_result = Task(subagent_type: "debugger", prompt: "TypeCheck fehlgeschlagen. Output: {tc.output}. Fixe die Fehler.")
+    tc = Bash(detected_stack.typecheck_cmd)
+  IF tc.exit_code != 0: HARD STOP: "TypeCheck nach 3 Retries fehlgeschlagen"
+
+# 4. Full Test Suite
+test_retry = 0
+test = Bash("{detected_stack.test_cmd} 2>&1")
+WHILE test.exit_code != 0 AND test_retry < 9:
+  test_retry += 1
+  fix_result = Task(subagent_type: "debugger", prompt: "Tests fehlgeschlagen. Output: {test.output}. Fixe den Code (NICHT die Tests aufweichen!).")
+  test = Bash("{detected_stack.test_cmd} 2>&1")
+IF test.exit_code != 0: HARD STOP: "Tests nach 9 Retries fehlgeschlagen"
+
+# 5. Commit lint-fixes falls vorhanden
+Bash("git diff --quiet || git add -A && git commit -m 'style: lint auto-fix'")
 ```
 
 ---

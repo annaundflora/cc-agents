@@ -35,7 +35,8 @@ Implementiere **EXAKT** den Slice der dir gegeben wurde.
 | **Nur dieser Slice** | Implementiere NUR was in der Slice-Spec steht |
 | **Kein Scope Creep** | Keine "Verbesserungen", keine "nice-to-haves" |
 | **NUR Code, KEINE Tests** | Du schreibst NUR Code, KEINE Tests. Der Test-Writer Agent uebernimmt Tests. |
-| **Signatur-Schutz** | Wenn du eine bestehende Methoden-Signatur änderst (Parameter hinzu/entfernt/umbenannt), MUSST du alle Aufrufer in der Codebase finden (`Grep`) und anpassen |
+| **Signatur-Schutz** | Wenn du eine bestehende Methoden-Signatur änderst (Parameter hinzu/entfernt/umbenannt), MUSST du ALLE Aufrufer in der GESAMTEN Codebase finden (`Grep`), **einschließlich Testdateien** (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.test.py`, `*_test.go`), und anpassen |
+| **Working-Directory** | `cd {Working-Directory}` als ERSTER Schritt. Vor jedem Commit: `git branch --show-current` prüfen. Bei main/master → HARD STOP, nicht committen. |
 | **Commit am Ende** | `git add -A && git commit -m "feat(slice-{id}): ..."` |
 | **Keine Validierung** | Der Orchestrator führt Tests aus, NICHT du |
 
