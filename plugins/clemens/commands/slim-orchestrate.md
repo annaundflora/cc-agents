@@ -15,12 +15,30 @@ Du orchestrierst die Implementierung eines Features slice-by-slice mit Sub-Agent
 4. **JSON-Parsing:** Jeder Sub-Agent-Output wird als JSON geparsed (letzter ```json``` Block). Bei Parse-Failure: HARD STOP.
 5. **9 Retries:** Max 9 Debugger-Retries pro Slice, max 3 Code-Review-Retries, max 3 Lint/TypeCheck-Retries. Danach HARD STOP.
 6. **Code Review ist binär:** APPROVED = weiter, REJECTED = fix. Bei parallelen Reviews: JEDES Ergebnis einzeln prüfen. REJECTED Slices fixen bevor die Wave weitergeht.
+7. **Phasen-Reihenfolge ist bindend:** Führe die Phasen EXAKT in der Reihenfolge 0→1→2→3→4→5→6→7→8 aus. Überspringe KEINE Phase.
 
 **Input:** $ARGUMENTS (Spec-Pfad)
 
 ---
 
-## Phase 1: Input-Validierung & Pre-Impl Sanity Check
+## Helper: JSON-Parsing
+
+```
+FUNCTION parse_agent_json(agent_output):
+  json_blocks = regex_find_all(agent_output, /```json\s*\n(.*?)```/s)
+  IF json_blocks.length == 0:
+    HARD STOP: "Agent hat keinen JSON-Output geliefert"
+  last_json = json_blocks[-1]
+  TRY:
+    parsed = JSON.parse(last_json)
+    RETURN parsed
+  CATCH:
+    HARD STOP: "JSON Parse Failure"
+```
+
+---
+
+## Phase 0: Input-Validierung & Pre-Impl Sanity Check
 
 ```
 1. Prüfe ob $ARGUMENTS einen Spec-Pfad enthält
@@ -40,7 +58,7 @@ Du orchestrierst die Implementierung eines Features slice-by-slice mit Sub-Agent
 
 ---
 
-## Phase 1b: Dependency Pre-Flight Check
+## Phase 1: Dependency Pre-Flight Check
 
 ```
 # Stack-agnostische Dependency-Validierung
@@ -99,7 +117,8 @@ state = {
   "spec_path": spec_path,
   "feature_name": feature_name,
   "status": "in_progress",
-  # Gueltige current_state-Werte: "worktree_setup" | "pre_scan" | "pre_check" |
+  # Gueltige current_state-Werte (in Phasen-Reihenfolge):
+  #   "pre_check" | "worktree_setup" | "pre_scan" |
   #   "implementing" | "code_review" | "deterministic_gate" | "writing_tests" |
   #   "validating" | "auto_fixing" | "slice_complete" | "final_validation" |
   #   "conflict_scan" | "conflict_report" | "feature_complete"
@@ -109,7 +128,10 @@ state = {
   "failed_stage": null,
   "waves": [...],
   "completed_slices": [],
-  "evidence_files": []
+  "evidence_files": [],
+  "worktree_path": null,
+  "branch": null,
+  "issue_number": null
 }
 
 IF EXISTS STATE_FILE:
@@ -123,27 +145,12 @@ Write(STATE_FILE, state)
 
 ---
 
-## Helper: JSON-Parsing
+## Phase 3: Worktree Setup + Pre-Scan
+
+**PFLICHT-PHASE — darf NICHT übersprungen werden.**
 
 ```
-FUNCTION parse_agent_json(agent_output):
-  json_blocks = regex_find_all(agent_output, /```json\s*\n(.*?)```/s)
-  IF json_blocks.length == 0:
-    HARD STOP: "Agent hat keinen JSON-Output geliefert"
-  last_json = json_blocks[-1]
-  TRY:
-    parsed = JSON.parse(last_json)
-    RETURN parsed
-  CATCH:
-    HARD STOP: "JSON Parse Failure"
-```
-
----
-
-## Phase 0: Worktree Setup + Pre-Scan
-
-```
-# Step 0a: Worktree erstellen oder rebasen
+# Step 3a: Worktree erstellen oder rebasen
 state.current_state = "worktree_setup"
 Write(STATE_FILE, state)
 
@@ -162,7 +169,7 @@ state.worktree_path = "worktrees/{feature_name}"
 state.branch = "feature/{feature_name}"
 Write(STATE_FILE, state)
 
-# Step 0b: Pre-Scan (Predicted Claims)
+# Step 3b: Pre-Scan (Predicted Claims) — erstellt GitHub Issue mit predicted file claims
 state.current_state = "pre_scan"
 Write(STATE_FILE, state)
 
@@ -187,7 +194,7 @@ Write(STATE_FILE, state)
 
 ---
 
-## Phase 2b: Stack Detection (läuft IMMER, auch bei Resume)
+## Phase 4: Stack Detection (läuft IMMER, auch bei Resume)
 
 **WICHTIG:** Stack Detection wird NICHT im State gecacht. Sie läuft bei jedem Start neu,
 weil sich die Projekt-Tooling zwischen Runs ändern kann (z.B. Pint installiert).
@@ -258,7 +265,7 @@ ELSE:
 
 ---
 
-## Phase 3: Wave-Based Implementation
+## Phase 5: Wave-Based Implementation
 
 ```
 FOR each wave IN waves:
@@ -499,14 +506,14 @@ FOR each wave IN waves:
 
 ---
 
-## Phase 4: Final Validation
+## Phase 6: Final Validation
 
 ```
 state.current_state = "final_validation"
 Write(STATE_FILE, state)
 
 # Lean Mode: Direkte Bash-Calls, KEIN Sub-Agent, KEIN Stack-Re-Detection.
-# Nutzt detected_stack aus Phase 2b.
+# Nutzt detected_stack aus Phase 4.
 
 # 1. Lint Auto-Fix
 IF detected_stack.lint_autofix_cmd != null:
@@ -547,7 +554,7 @@ Bash("git diff --quiet || git add -A && git commit -m 'style: lint auto-fix'")
 
 ---
 
-## Phase 4b: Conflict Scan (non-blocking)
+## Phase 7: Conflict Scan (non-blocking)
 
 ```
 # Step 1: Scanner-Agent aufrufen (Post-Scan)
@@ -588,7 +595,7 @@ IF state.issue_number is not null:
 
 ---
 
-## Phase 5: Completion
+## Phase 8: Completion
 
 ```
 state.current_state = "feature_complete"
