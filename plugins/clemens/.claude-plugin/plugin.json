@@ -1,7 +1,7 @@
 {
   "name": "clemens",
   "description": "Clemens' Agent-Toolkit: Multi-Agent System mit Fresh Context Pattern, Quality Gates (0-3), und vollständigem Feature-Development-Workflow von Discovery bis Deployment.",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "author": {
     "name": "Clemens",
     "email": "claude-clemens@zipmend.com"
