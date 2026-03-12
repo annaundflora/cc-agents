@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "annaundflora": {
+      "source": {
+        "source": "directory",
+        "path": "E:\\WebDev\\cc-agents"
+      }
+    }
+  }
+}
