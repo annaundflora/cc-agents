@@ -169,7 +169,8 @@ state.worktree_path = "worktrees/{feature_name}"
 state.branch = "feature/{feature_name}"
 Write(STATE_FILE, state)
 
-# Step 3b: Pre-Scan (Predicted Claims) — erstellt GitHub Issue mit predicted file claims
+# Step 3b: Pre-Scan (Predicted Claims)
+# PFLICHT — erstellt das GitHub Issue für diese Pipeline-Session.
 state.current_state = "pre_scan"
 Write(STATE_FILE, state)
 
@@ -183,11 +184,12 @@ scanner_json = parse_agent_json(scanner_result)
 
 IF scanner_json.status == "completed":
   state.issue_number = scanner_json.issue_number
+  OUTPUT: "Pre-Scan: GitHub Issue #{state.issue_number} erstellt."
   IF scanner_json.has_overlap:
-    OUTPUT: "⚠️ Pre-Scan: Overlap mit anderen Sessions gefunden. Advisory — Pipeline laeuft weiter."
+    OUTPUT: "⚠️ Overlap gefunden. Implementation startet trotzdem."
     OUTPUT: scanner_json.notes
 ELIF scanner_json.status == "failed":
-  OUTPUT: "Warning: Pre-scan failed: {scanner_json.notes}. Pipeline laeuft weiter."
+  OUTPUT: "Warning: Pre-scan failed: {scanner_json.notes}. Implementation startet ohne Claims."
 
 Write(STATE_FILE, state)
 ```
@@ -554,7 +556,7 @@ Bash("git diff --quiet || git add -A && git commit -m 'style: lint auto-fix'")
 
 ---
 
-## Phase 7: Conflict Scan (non-blocking)
+## Phase 7: Conflict Post-Scan
 
 ```
 # Step 1: Scanner-Agent aufrufen (Post-Scan)
