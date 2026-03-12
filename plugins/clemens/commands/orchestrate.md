@@ -532,32 +532,36 @@ Bash("git diff --quiet || git add -A && git commit -m 'style: lint auto-fix'")
 state.current_state = "conflict_scan"
 Write(STATE_FILE, state)
 
-scanner_result = Task("conflict-scanner", {
-  mode: "actual",
-  branch: state.branch,
-  spec_path: state.spec_path,
-  repo: repo,
-  issue_number: state.issue_number
-})
-scanner_json = parse_agent_json(scanner_result)
-
-# Step 2: Bedingt Reporter-Agent aufrufen
-IF scanner_json.status == "completed" AND scanner_json.has_overlap == true:
-  state.current_state = "conflict_report"
-  Write(STATE_FILE, state)
-  reporter_result = Task("conflict-reporter", {
-    overlap_report_path: "{state.spec_path}/overlap-report.json",
-    own_issue_number: state.issue_number,
-    repo: repo
+IF state.issue_number is null:
+  OUTPUT: "Warning: Kein GitHub Issue vorhanden (Pre-Scan fehlgeschlagen?). Post-Scan übersprungen."
+ELSE:
+  scanner_result = Task("conflict-scanner", {
+    mode: "actual",
+    branch: state.branch,
+    spec_path: state.spec_path,
+    repo: repo,
+    issue_number: state.issue_number
   })
-  reporter_json = parse_agent_json(reporter_result)
-  IF reporter_json.status == "failed":
-    OUTPUT: "Warning: Conflict reporter failed: {reporter_json.notes}"
-ELIF scanner_json.status == "completed" AND scanner_json.has_overlap == false:
-  OUTPUT: "Post-Scan: Keine Overlaps gefunden."
-ELIF scanner_json.status == "failed":
-  OUTPUT: "Warning: Conflict scan failed: {scanner_json.notes}"
-  # Non-blocking — Pipeline geht weiter
+  scanner_json = parse_agent_json(scanner_result)
+
+  IF scanner_json.status == "completed":
+    OUTPUT: "Post-Scan: Claims aktualisiert auf Issue #{state.issue_number}."
+    # Step 2: Bedingt Reporter-Agent aufrufen
+    IF scanner_json.has_overlap == true:
+      state.current_state = "conflict_report"
+      Write(STATE_FILE, state)
+      reporter_result = Task("conflict-reporter", {
+        overlap_report_path: "{state.spec_path}/overlap-report.json",
+        own_issue_number: state.issue_number,
+        repo: repo
+      })
+      reporter_json = parse_agent_json(reporter_result)
+      IF reporter_json.status == "failed":
+        OUTPUT: "Warning: Conflict reporter failed: {reporter_json.notes}"
+    ELSE:
+      OUTPUT: "Keine Overlaps gefunden."
+  ELIF scanner_json.status == "failed":
+    OUTPUT: "Warning: Conflict scan failed: {scanner_json.notes}"
 
 # Step 3: Label wechseln (immer — best-effort)
 IF state.issue_number is not null:
