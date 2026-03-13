@@ -31,17 +31,18 @@ Führe einen **interaktiven Design-Prozess** zwischen Discovery und Wireframe. R
 ```
 1. Discovery lesen
 2. Design System Recherche (Codebase: Tokens, Variables, Theme-Files, Component-Library)
-3. Modus bestimmen:
+3. Visual Audit: Betroffene Screens im Browser screenshotten (Chrome DevTools MCP)
+4. Modus bestimmen:
    - DS gefunden → Fokus-Modus
    - Kein DS → Exploration-Modus (Scope-Frage: DS-Erstellung?)
-4. Medium-Wahl: Pencil oder ASCII (User entscheidet)
-5. DIVERGE: Recherche (Codebase, Web UX Patterns, ggf. Pencil Guidelines)
-6. Exploration-Modus: Tone/Style-Findung + ggf. Design System Erstellung
-7. Pro Screen:
-   a) Style-Analyse: existierende Styles der betroffenen Elemente im Code
+5. Medium-Wahl: Pencil oder ASCII (User entscheidet)
+6. DIVERGE: Recherche (Codebase, Web UX Patterns, ggf. Pencil Guidelines)
+7. Exploration-Modus: Tone/Style-Findung + ggf. Design System Erstellung
+8. Pro Screen:
+   a) Live Style-Analyse: Screenshots + Computed Styles via Chrome DevTools
    b) CONVERGE: 2-3 Layout-Varianten generieren
    c) User wählt Variante
-8. design-decisions.md schreiben
+9. design-decisions.md schreiben
 ```
 
 ---
@@ -100,11 +101,65 @@ Grep: "tailwind.config" — Custom Theme Extensions
 
 ---
 
+## Visual Audit (Chrome DevTools MCP)
+
+**Früh im DIVERGE:** Betroffene Screens im laufenden Browser screenshotten, um das tatsächliche Design als Baseline zu haben.
+
+### Ablauf
+
+```
+1. navigate_page(url) — Betroffene Seiten/Views ansteuern
+2. take_screenshot() — Viewport screenshotten (Ist-Zustand)
+3. take_screenshot(fullPage: true) — Volle Seite bei Scroll-Content
+4. take_snapshot() — A11y-Tree für Struktur-Analyse (UIDs der Elemente)
+5. evaluate_script — Computed Styles der Key-Elemente extrahieren (siehe unten)
+```
+
+### Computed Styles extrahieren
+
+```javascript
+// Farben, Fonts, Spacing eines Elements via UID
+(el) => {
+  const s = getComputedStyle(el);
+  return {
+    color: s.color, background: s.backgroundColor,
+    font: `${s.fontWeight} ${s.fontSize}/${s.lineHeight} ${s.fontFamily}`,
+    padding: s.padding, margin: s.margin, gap: s.gap,
+    border: s.border, borderRadius: s.borderRadius
+  };
+}
+```
+
+### Wann nutzen
+
+| Zeitpunkt | Was | Warum |
+|-----------|-----|-------|
+| DIVERGE (Schritt 3) | Alle betroffenen Screens screenshotten | Visuelle Baseline für Varianten |
+| Style-Analyse pro Screen | Computed Styles der Key-Elemente | Echte gerenderte Werte statt Code-Analyse |
+| Varianten-Präsentation | User sieht Ist-Zustand neben Varianten | Vergleichbarkeit |
+
+### Fallback
+
+Wenn Chrome DevTools MCP nicht verfügbar (kein Browser offen, keine App läuft) → Fallback auf Code-Analyse (Grep/Read). Hinweis an User: "Für bessere Ergebnisse App im Browser starten."
+
+---
+
 ## Style-Analyse (vor jeder Varianten-Runde)
 
-**IMMER** vor Varianten-Generierung pro Screen: existierende Styles der betroffenen Elemente/Components analysieren.
+**IMMER** vor Varianten-Generierung pro Screen: existierende Styles analysieren.
 
-### Was analysieren
+**Bevorzugte Methode: Chrome DevTools** (gerenderte Realität > Code-Analyse)
+
+### 1. Live-Analyse (Chrome DevTools — bevorzugt)
+
+```
+navigate_page(url) — Screen ansteuern
+take_screenshot() — Aktuellen Zustand festhalten
+take_snapshot() — UIDs der Elemente erhalten
+evaluate_script((el) => getComputedStyle(el), [uid]) — Pro Key-Element
+```
+
+### 2. Code-Analyse (Fallback)
 
 ```
 Grep: Farben (hex, rgb, hsl, CSS variables) in betroffenen Components
@@ -117,6 +172,7 @@ Read: Existierende Component-Dateien der betroffenen Elemente
 ### Output der Analyse
 
 Kompakte Zusammenfassung für User:
+- Screenshot des Ist-Zustands (wenn verfügbar)
 - Existierende Farben/Tokens der betroffenen Components
 - Verwendete Spacing-Scale
 - Typography-Patterns
@@ -226,7 +282,8 @@ Extrahiert aus Design Thinking — als Leitfaden, nicht als Checklist:
 ### DO
 
 - Design System SELBST recherchieren (Glob/Grep), nicht User fragen
-- Style-Analyse VOR jeder Varianten-Runde
+- **Visual Audit früh:** Screenshots der betroffenen Screens via Chrome DevTools
+- **Live Style-Analyse** VOR jeder Varianten-Runde (Chrome DevTools > Code-Analyse)
 - 2-3 Varianten pro Screen, substanziell unterschiedlich
 - Stärken/Schwächen pro Variante benennen
 - Medium pro Entscheidungspunkt individuell wählbar

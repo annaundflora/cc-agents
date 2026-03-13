@@ -36,13 +36,15 @@
 
 #### Style-Analyse
 
-| Aspekt | Existierender Wert |
-|--------|--------------------|
-| Farben | {Gefundene Farben/Tokens} |
-| Spacing | {Gefundene Spacing-Werte} |
-| Typography | {Gefundene Font-Patterns} |
-| Layout-Pattern | {Grid/Flex/etc.} |
-| Components | {Existierende Components die wiederverwendet werden} |
+**Ist-Zustand:** {Screenshot-Beschreibung oder "Kein Browser verfügbar — Code-Analyse"}
+
+| Aspekt | Existierender Wert | Quelle |
+|--------|--------------------|--------|
+| Farben | {Gefundene Farben/Tokens} | {DevTools/Code} |
+| Spacing | {Gefundene Spacing-Werte} | {DevTools/Code} |
+| Typography | {Gefundene Font-Patterns} | {DevTools/Code} |
+| Layout-Pattern | {Grid/Flex/etc.} | {DevTools/Code} |
+| Components | {Existierende Components die wiederverwendet werden} | {DevTools/Code} |
 
 #### Varianten
 
