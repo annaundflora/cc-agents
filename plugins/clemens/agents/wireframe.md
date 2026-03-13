@@ -44,25 +44,44 @@ specs/YYYY-MM-DD-{epic-name}/
    - `.claude/skills/web-design/SKILL.md` - Layout patterns, Touch targets, Responsive
    - `.claude/skills/tailwind-v4/SKILL.md` - Container queries, Spacing scale
 3. Discovery-Doc lesen
-4. UI Layout & Context extrahieren
-5. UI Components extrahieren
-6. Component Coverage Table erstellen
-7. Für jeden Screen: ASCII-Wireframe erstellen
-8. Annotationen hinzufügen
-9. State Variations pro Screen dokumentieren
-10. Wireframe-Doc schreiben
-11. Self-Check durchführen
+4. Design Decisions prüfen (optional, siehe unten)
+5. UI Layout & Context extrahieren
+6. UI Components extrahieren
+7. Component Coverage Table erstellen
+8. Für jeden Screen: ASCII-Wireframe erstellen (Design Decisions als Constraint)
+9. Annotationen hinzufügen
+10. State Variations pro Screen dokumentieren
+11. Wireframe-Doc schreiben
+12. Self-Check durchführen
 ```
+
+---
+
+## Design Decisions (optionaler Input)
+
+Prüfe ob `design-decisions.md` im gleichen Spec-Ordner existiert.
+
+**Falls vorhanden:** Lies die Datei und nutze sie als **Constraint** für Wireframe-Erstellung:
+
+| Section in design-decisions.md | Auswirkung auf Wireframe |
+|-------------------------------|--------------------------|
+| Screen Decisions → Layout-Skizze | Wireframe MUSS gewähltes Layout umsetzen |
+| Constraints für Wireframe Agent | Bindende Vorgaben (Layout-Pattern, Component-Wahl, Hierarchie) |
+| Design Context → Tone & Direction | Informiert visuelle Entscheidungen |
+| Style-Analyse pro Screen | Existierende Patterns respektieren |
+
+**Falls nicht vorhanden:** Normaler Workflow ohne Design Constraints (rückwärtskompatibel).
 
 ---
 
 ## Input-Anforderungen
 
-Das Discovery-Doc MUSS folgende Sections enthalten:
-- `## UI Layout & Context` - Beschreibt Screens und Layout
-- `## UI Components & States` - Liste aller interaktiven Elemente
+**Pflicht:**
+- `discovery.md` mit Sections `## UI Layout & Context` und `## UI Components & States`
+- Falls diese fehlen → Abbruch mit Hinweis an PM
 
-Falls diese fehlen → Abbruch mit Hinweis an PM.
+**Optional:**
+- `design-decisions.md` — wenn vorhanden, als Constraint nutzen (siehe oben)
 
 ---
 

@@ -133,6 +133,7 @@ LOOP:
     Lies:
     - {spec_path}/discovery.md
     - {spec_path}/wireframes.md
+    - {spec_path}/design-decisions.md (NUR wenn vorhanden — 3. Prüfpfad)
 
     Erstelle: {spec_path}/compliance-discovery-wireframe.md
 
