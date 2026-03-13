@@ -16,6 +16,7 @@ Du orchestrierst die Implementierung eines Features slice-by-slice mit Sub-Agent
 5. **9 Retries:** Max 9 Debugger-Retries pro Slice, max 3 Code-Review-Retries, max 3 Lint/TypeCheck-Retries. Danach HARD STOP.
 6. **Code Review ist binär:** APPROVED = weiter, REJECTED = fix. Bei parallelen Reviews: JEDES Ergebnis einzeln prüfen. REJECTED Slices fixen bevor die Wave weitergeht.
 7. **Phasen-Reihenfolge ist bindend:** Führe die Phasen EXAKT in der Reihenfolge 0→1→2→3→4→5→6→7→8 aus. Überspringe KEINE Phase.
+8. **State-Pflege ist PFLICHT:** Schreibe `Write(STATE_FILE, state)` VOR und NACH jedem Step in Phase 5. State-Updates sind gleichwertig mit Task()-Calls — NIEMALS überspringen. Aktualisiere `current_state`, `current_slice_id`, `completed_slices` nach jedem abgeschlossenen Slice.
 
 **Input:** $ARGUMENTS (Spec-Pfad)
 
@@ -95,6 +96,8 @@ IF ANY check failed:
 ---
 
 ## Phase 2: Setup & State Management
+
+**PFLICHT-PHASE — darf NICHT übersprungen werden. State muss in JEDER Phase aktuell gehalten werden.**
 
 ```
 STATE_FILE = "{spec_path}/.orchestrator-state.json"
@@ -268,6 +271,8 @@ ELSE:
 ---
 
 ## Phase 5: Wave-Based Implementation
+
+**STATE-PFLEGE PRO STEP (Regel 8):** Vor jedem Step `state.current_state` + `state.current_slice_id` setzen und `Write(STATE_FILE, state)` ausführen. Nach Wave-Abschluss `completed_slices` aktualisieren und erneut schreiben. Dies ist KEIN optionaler Pseudocode — es ist eine gleichwertige Aktion wie der Task()-Call selbst.
 
 ```
 FOR each wave IN waves:
