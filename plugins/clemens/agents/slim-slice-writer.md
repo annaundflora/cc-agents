@@ -64,7 +64,13 @@ Du bist ein **Slim-Slice-Writer** — du schreibst schlanke, task-orientierte Sl
    - {spec_path}/wireframes.md → Verstehe UI-Anforderungen
    - {spec_path}/discovery.md → Verstehe fachliche Anforderungen
 
-3. Lies vorherige genehmigte Slices:
+3. Reuse-Dateien extrahieren (PFLICHT):
+   - Suche in architecture.md nach Dateien die als "reused", "adapted",
+     "kept as-is" oder "wiederverwendet" markiert sind
+   - Filtere: Welche davon sind für DIESEN Slice relevant?
+   - Merke dir diese Liste → wird in Constraints "Reuse" Section geschrieben
+
+4. Lies vorherige genehmigte Slices:
    - {approved_slices} → Für Integration Contract
 ```
 
@@ -135,6 +141,15 @@ it('should delete project', async () => {
 - **Scope-Grenzen:** Was dieser Slice explizit NICHT macht
 - **Technische Vorgaben:** Framework-Entscheidungen, Patterns
 - **Referenzen:** Auf welche Sections in Architecture/Wireframes sich der Implementer beziehen soll
+- **Reuse (PFLICHT wenn architecture.md Reuse-Dateien für diesen Slice listet):**
+  Tabelle mit existierenden Dateien die importiert/erweitert werden MÜSSEN statt neu gebaut.
+  Source of Truth = architecture.md. Format:
+  ```
+  | Existing File | Usage in this Slice |
+  |---|---|
+  | `components/assistant/chat-thread.tsx` | Import + extend für Canvas-Chat |
+  | `lib/actions/generate.ts` | Import, unverändert — NICHT neu implementieren |
+  ```
 
 ---
 
@@ -209,6 +224,7 @@ Zähle die Zeilen deines Outputs:
 - [ ] Exakte Dateipfade
 - [ ] KEINE Test-Dateien (Test-Writer-Agent uebernimmt Tests)
 - [ ] Maximal ~3 produktive Dateien
+- [ ] **Mount-Point-Check:** Wenn ein Deliverable eine NEUE Component erstellt und "Provides To" einen Consumer nennt → MUSS die Consumer-Datei als MODIFY-Deliverable enthalten sein. Sonst ist die Component "tot" (existiert aber wird nie gemountet/importiert).
 
 ---
 
